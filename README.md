@@ -2,7 +2,7 @@
 
 > A full-stack event management web application to create, manage, and explore events seamlessly.
 
-🔗 **Live Demo:** [eventify-eight-swart.vercel.app](https://eventify-eight-swart.vercel.app)
+🔗 **Live Demo:** [eventify-eight-swart.vercel.app](https://eventifyyyy.vercel.app/)
 
 ---
 

@@ -22,6 +22,9 @@ const volunteeringSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+volunteeringSchema.index({ userId: 1, eventId: 1 }, { unique: true });
+volunteeringSchema.index({ eventId: 1 });
+
 const Volunteering = mongoose.model("Volunteering", volunteeringSchema);
 
 export default Volunteering;

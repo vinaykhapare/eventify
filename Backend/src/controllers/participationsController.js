@@ -1,5 +1,6 @@
 import Event from "../models/Event.js";
 import Participation from "../models/Participation.js";
+import { createAndEmitNotification, emitDashboardUpdate } from "../services/socketService.js";
 
 // POST /participations
 export async function registerForEvent(req, res) {
@@ -56,11 +57,30 @@ export async function registerForEvent(req, res) {
     }
 
     //  register
-    await Participation.create({ eventId, userId });
+    const participation = await Participation.create({ eventId, userId });
+
+    createAndEmitNotification({
+      recipient: userId,
+      type: "TICKET_PURCHASE",
+      title: "Registration Confirmed!",
+      message: `You have successfully registered for ${event.name}. Show your digital QR pass at check-in.`,
+      data: { participationId: participation._id, eventId },
+    });
+
+    createAndEmitNotification({
+      recipient: null,
+      recipientRole: "ADMIN",
+      type: "REGISTRATION",
+      title: "New Registration",
+      message: `${req.user?.name || "A student"} registered for ${event.name}.`,
+      data: { participationId: participation._id, eventId },
+    });
+
+    emitDashboardUpdate();
 
     return res
       .status(201)
-      .json({ success: true, message: "Successfully registered!" });
+      .json({ success: true, message: "Successfully registered!", participation });
   } catch (error) {
     console.log("Register Error:", error);
     return res.status(500).json({ message: "Failed to register" });
@@ -70,75 +90,108 @@ export async function registerForEvent(req, res) {
 
 // GET /participations/me (QR codes)
 export async function getAllTickets(req, res) {
-  const userId = req.user.id;
+  try {
+    const userId = req.user?.id;
 
-  if (!userId) {
-    res.status(401).json({ message: "User is not authenticated" });
+    if (!userId) {
+      return res.status(401).json({ message: "User is not authenticated" });
+    }
+
+    const participations = await Participation.find({ userId }).populate({
+      path: "eventId",
+    });
+
+    // remove assignments where event is deleted / null
+    const validParticipations = participations.filter((a) => a.eventId);
+
+    return res.status(200).json({ tickets: validParticipations });
+  } catch (error) {
+    console.error("Get Tickets Error:", error);
+    return res.status(500).json({ message: "Failed to fetch tickets" });
   }
-
-  const participations = await Participation.find({ userId }).populate({
-    path: "eventId",
-  });
-
-  // remove assignments where event is deleted / null
-  const validParticipations = participations.filter((a) => a.eventId);
-
-  res.status(200).json({ tickets: validParticipations });
 }
 
 // POST /participations/:participationId/checkin
 export async function checkInParticipant(req, res) {
-  const eventId = req.body.eventId;
+  try {
+    const eventId = req.body.eventId;
+    const participationId = req.params.participationId;
 
-  const participationId = req.params.participationId;
+    if (!participationId) {
+      return res.status(400).json({ success: false, message: "Participation ID is required" });
+    }
 
-  //check if participation exists;
-  const participation = await Participation.findById(participationId).populate({
-    path: "eventId",
-  });
-
-  if (!participation) {
-    return res
-      .status(404)
-      .json({ success: false, messsage: "user is not a participant" });
-  }
-
-  //check if user already checked in
-  if (participation.checkedIn) {
-    return res
-      .status(400)
-      .json({ success: false, messsage: "user already checked in!" });
-  }
-
-  //check event
-  if (participation.eventId.id !== eventId) {
-    return res.status(400).json({
-      success: false,
-      messsage: "user is not participant of this event",
+    // check if participation exists
+    const participation = await Participation.findById(participationId).populate({
+      path: "eventId",
     });
-  }
 
-  //check if event expired
-  if (new Date() > participation.eventId.endTime) {
-    return res.status(400).json({
-      success: false,
-      messsage: "event already expired!",
+    if (!participation) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User is not a participant" });
+    }
+
+    // check if event exists
+    if (!participation.eventId) {
+      return res.status(404).json({
+        success: false,
+        message: "Associated event not found or has been deleted",
+      });
+    }
+
+    // check if user already checked in
+    if (participation.checkedIn) {
+      return res
+        .status(400)
+        .json({ success: false, message: "User already checked in!" });
+    }
+
+    // check event match (safe string comparison)
+    const participationEventId = participation.eventId._id ? participation.eventId._id.toString() : String(participation.eventId);
+    if (participationEventId !== String(eventId)) {
+      return res.status(400).json({
+        success: false,
+        message: "User is not participant of this event",
+      });
+    }
+
+    // check if event expired
+    if (participation.eventId.endTime && new Date() > new Date(participation.eventId.endTime)) {
+      return res.status(400).json({
+        success: false,
+        message: "Event already expired!",
+      });
+    }
+
+    // if everything is okay
+    await Participation.findByIdAndUpdate(
+      participationId,
+      {
+        checkedIn: true,
+        checkInTime: new Date(),
+      },
+      { new: true },
+    );
+
+    createAndEmitNotification({
+      recipient: null,
+      recipientRole: "ADMIN",
+      type: "ATTENDEE_CHECKIN",
+      title: "Gate Admission",
+      message: `${participation.userId?.name || "An attendee"} checked in to ${participation.eventId?.name || "the event"}.`,
+      data: { participationId, eventId },
     });
+
+    emitDashboardUpdate();
+
+    return res
+      .status(200)
+      .json({ success: true, message: "Successfully checked in!" });
+  } catch (error) {
+    console.error("Check-in Error:", error);
+    return res.status(500).json({ success: false, message: "Failed to check in participant" });
   }
-
-  //if everything is okay
-  await Participation.findByIdAndUpdate(
-    participationId,
-    {
-      checkedIn: true,
-      checkInTime: new Date(),
-    },
-    { new: true },
-  );
-
-  return res
-    .status(200)
-    .json({ success: true, message: "successfully checked in!" });
 }
 
 

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
-import { useAuthContext } from "../../../hooks/useAuthContext";
+import toast from "react-hot-toast";
+import { Link } from "react-router-dom";
 import {
   Users,
   Search,
@@ -9,53 +10,19 @@ import {
   CheckCircle2,
   MapPin,
   X,
+  UserCog,
+  CalendarCheck,
+  Calendar,
+  Layers,
+  ArrowLeft,
+  ChevronDown,
 } from "lucide-react";
+import DashboardLayout from "../../components/layout/DashboardLayout";
+import { useAuthContext } from "../../hooks/useAuthContext";
 
-const BRAND = {
-  grad: "linear-gradient(135deg, #D4607A 0%, #8B5CB7 50%, #534AB7 100%)",
-  gradH: "linear-gradient(90deg,  #D4607A 0%, #8B5CB7 50%, #534AB7 100%)",
-  coral: "#D4607A",
-  purple: "#534AB7",
-  border: "#EDD9F0",
-  coralSurface: "#FDF0F3",
-  purpleSurface: "#F3F0FD",
-};
+const baseURL = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/+$/, "");
 
-const STATUS_STYLE = {
-  LIVE: { bg: "#ECFDF5", text: "#065F46", border: "#A7F3D0" },
-  UPCOMING: { bg: BRAND.purpleSurface, text: BRAND.purple, border: "#C4BBF0" },
-  COMPLETED: { bg: "#F3F4F6", text: "#6B7280", border: "#E5E7EB" },
-};
-
-const StatusPill = ({ status }) => {
-  const s = STATUS_STYLE[status] || STATUS_STYLE.COMPLETED;
-  return (
-    <span
-      className="px-2.5 py-0.5 text-[11px] font-bold rounded-full border shrink-0"
-      style={{ background: s.bg, color: s.text, borderColor: s.border }}
-    >
-      {status === "LIVE" && (
-        <span className="inline-flex items-center gap-1">
-          <span className="relative flex h-1.5 w-1.5 mr-0.5">
-            <span
-              className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75"
-              style={{ background: "#1D9E75" }}
-            />
-            <span
-              className="relative inline-flex rounded-full h-1.5 w-1.5"
-              style={{ background: "#1D9E75" }}
-            />
-          </span>
-          LIVE
-        </span>
-      )}
-      {status !== "LIVE" && status}
-    </span>
-  );
-};
-
-const AssignVolunteer = () => {
-  const baseURL = import.meta.env.VITE_API_URL;
+export default function AssignVolunteer() {
   const { auth } = useAuthContext();
 
   const [volunteers, setVolunteers] = useState([]);
@@ -69,9 +36,9 @@ const AssignVolunteer = () => {
   const [assigning, setAssigning] = useState(false);
 
   const getEventStatus = (event) => {
-    const now = new Date(),
-      start = new Date(event.startTime),
-      end = new Date(event.endTime);
+    const now = new Date();
+    const start = new Date(event.startTime);
+    const end = new Date(event.endTime);
     if (now > end) return "COMPLETED";
     if (now >= start && now <= end) return "LIVE";
     return "UPCOMING";
@@ -80,6 +47,7 @@ const AssignVolunteer = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
+        setLoading(true);
         const [volRes, eventRes] = await Promise.all([
           axios.get(`${baseURL}/volunteering`, {
             headers: { Authorization: `Bearer ${auth.token}` },
@@ -89,36 +57,28 @@ const AssignVolunteer = () => {
           }),
         ]);
 
-        // GET /volunteering now returns a plain array of assignment objects
-        // Each item has: { id, name, email, phone, assignedEvent, duty, status, joinedAt }
-        // But for the volunteer dropdown we need unique users — deduplicate by email
         const allAssignments = Array.isArray(volRes.data) ? volRes.data : [];
         const seen = new Set();
-        const uniqueVolunteers = allAssignments.reduce((acc, item) => {
-          if (!seen.has(item.email)) {
-            seen.add(item.email);
-            // We need _id for the select value — stored as item.id (the assignment _id won't work,
-            // so we get userId from the volunteering assignment's userId populate)
-            // The backend still returns id: a._id (assignment id), not the user id.
-            // We need to call GET /volunteering which now returns assignment rows.
-            // The volunteer dropdown needs userId — handled below via separate endpoint.
+        const unique = allAssignments.reduce((acc, item) => {
+          if (!seen.has(item.id)) {
+            seen.add(item.id);
             acc.push(item);
           }
           return acc;
         }, []);
-        setVolunteers(uniqueVolunteers);
+        setVolunteers(unique);
 
-        // Events endpoint — handle both { events: [] } and plain array
         const eventsData = eventRes.data?.events ?? eventRes.data;
         setEvents(Array.isArray(eventsData) ? eventsData : []);
-      } catch {
-        alert("Failed to load volunteers/events");
+      } catch (err) {
+        console.error("Fetch data error:", err);
+        toast.error("Failed to load volunteers and events");
       } finally {
         setLoading(false);
       }
     };
     if (auth?.token) fetchData();
-  }, [auth?.token, baseURL]);
+  }, [auth?.token]);
 
   useEffect(() => {
     const fetchAssigned = async () => {
@@ -126,75 +86,52 @@ const AssignVolunteer = () => {
         setAssignedEventIds([]);
         return;
       }
-
       try {
         setFetchingAssigned(true);
-
-        const res = await axios.get(
-          `${baseURL}/volunteering/${selectedVolunteer}`,
-          {
-            headers: { Authorization: `Bearer ${auth.token}` },
-          },
-        );
-
+        const res = await axios.get(`${baseURL}/volunteering/${selectedVolunteer}`, {
+          headers: { Authorization: `Bearer ${auth.token}` },
+        });
         const ids = res.data?.assignedEventIds || [];
         setAssignedEventIds(ids.map((id) => id.toString()));
       } catch (error) {
-        console.error("Fetch Assigned Events Error:", error);
-
-        const message =
-          error.response?.data?.message ||
-          error.message ||
-          "Failed to fetch assigned events";
-
-        alert(message);
+        console.error("Fetch assigned error:", error);
       } finally {
         setFetchingAssigned(false);
       }
     };
-
-    if (auth?.token) {
-      fetchAssigned();
-    }
-  }, [selectedVolunteer, auth?.token, baseURL]);
+    if (auth?.token) fetchAssigned();
+  }, [selectedVolunteer, auth?.token]);
 
   const assignedEvents = useMemo(
     () => events.filter((e) => assignedEventIds.includes(e._id)),
-    [events, assignedEventIds],
+    [events, assignedEventIds]
   );
+
   const availableEvents = useMemo(
     () => events.filter((e) => !assignedEventIds.includes(e._id)),
-    [events, assignedEventIds],
+    [events, assignedEventIds]
   );
 
   const filteredAvailableEvents = useMemo(() => {
     if (!searchEvent.trim()) return availableEvents;
     const q = searchEvent.toLowerCase();
     return availableEvents.filter(
-      (e) =>
-        e.name.toLowerCase().includes(q) || e.venue.toLowerCase().includes(q),
+      (e) => e.name?.toLowerCase().includes(q) || e.venue?.toLowerCase().includes(q)
     );
   }, [availableEvents, searchEvent]);
 
-  const selectedEventObjects = useMemo(
-    () => events.filter((e) => selectedEvents.includes(e._id)),
-    [events, selectedEvents],
-  );
-
   const handleToggleEvent = (id) =>
     setSelectedEvents((prev) =>
-      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
     );
-  const handleRemoveSelected = (id) =>
-    setSelectedEvents((prev) => prev.filter((i) => i !== id));
 
   const handleAssign = async () => {
     if (!selectedVolunteer) {
-      alert("Select a volunteer first!");
+      toast.error("Please select a volunteer first");
       return;
     }
     if (!selectedEvents.length) {
-      alert("Select at least 1 event!");
+      toast.error("Select at least 1 event shift");
       return;
     }
     try {
@@ -202,430 +139,283 @@ const AssignVolunteer = () => {
       const res = await axios.post(
         `${baseURL}/volunteering/assign`,
         { userId: selectedVolunteer, events: selectedEvents },
-        { headers: { Authorization: `Bearer ${auth.token}` } },
+        { headers: { Authorization: `Bearer ${auth.token}` } }
       );
-      alert(res.data.message || "Assigned successfully!");
-      setAssignedEventIds((prev) =>
-        Array.from(new Set([...prev, ...selectedEvents])),
-      );
+      toast.success(res.data?.message || "Shifts assigned successfully!");
+      setAssignedEventIds((prev) => Array.from(new Set([...prev, ...selectedEvents])));
       setSelectedEvents([]);
       setSearchEvent("");
     } catch (error) {
-      alert(error.response?.data?.message || "Failed to assign events");
+      toast.error(error.response?.data?.message || "Failed to assign shifts");
     } finally {
       setAssigning(false);
     }
   };
 
-  // ── Skeleton ─────────────────────────────────────────────────────────────
-  const Skel = ({ className }) => (
-    <div
-      className={`animate-pulse rounded-xl ${className}`}
-      style={{ background: "#F3F0FD" }}
-    />
-  );
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-[#faf8fc] px-4 sm:px-8 py-8 pb-20">
-        <div className="max-w-6xl mx-auto space-y-6">
-          <div
-            className="bg-white rounded-2xl border p-6 sm:p-8"
-            style={{ borderColor: BRAND.border }}
-          >
-            <div className="flex items-center gap-3 mb-6">
-              <Skel className="w-11 h-11" />
-              <div className="space-y-2 flex-1">
-                <Skel className="h-6 w-64" />
-                <Skel className="h-4 w-80" />
-              </div>
-            </div>
-            <Skel className="h-12 w-full" />
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {[1, 2].map((i) => (
-              <div
-                key={i}
-                className="bg-white rounded-2xl border p-6 sm:p-8 space-y-4"
-                style={{ borderColor: BRAND.border }}
-              >
-                <Skel className="h-6 w-56" />
-                <Skel className="h-4 w-72" />
-                {[1, 2, 3, 4].map((j) => (
-                  <Skel key={j} className="h-16 w-full" />
-                ))}
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  const PlaceholderCard = ({ message }) => (
-    <div
-      className="text-sm text-center rounded-xl p-5 border"
-      style={{
-        background: BRAND.purpleSurface,
-        borderColor: "#C4BBF0",
-        color: BRAND.purple,
-      }}
-    >
-      {message}
-    </div>
-  );
+  const selectedVolunteerObj = volunteers.find((v) => v.id === selectedVolunteer);
 
   return (
-    <div className="min-h-screen bg-[#faf8fc] px-4 sm:px-8 py-8 pb-20">
-      <div className="max-w-6xl mx-auto space-y-6">
-        {/* ── Header card ─────────────────────────────────────────────── */}
-        <div
-          className="bg-white rounded-2xl border shadow-sm p-6 sm:p-8"
-          style={{ borderColor: BRAND.border }}
-        >
-          <div className="flex items-center gap-3 mb-1">
-            <div
-              className="size-11 rounded-2xl flex items-center justify-center border shrink-0"
-              style={{
-                background: BRAND.purpleSurface,
-                borderColor: "#C4BBF0",
-              }}
-            >
-              <Users size={20} style={{ color: BRAND.purple }} />
-            </div>
-            <div>
-              <h2
-                className="text-2xl sm:text-3xl font-black"
-                style={{
-                  background: BRAND.gradH,
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                  backgroundClip: "text",
-                }}
-              >
-                Assign Events to Volunteer
+    <DashboardLayout>
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <Link
+            to="/admin/volunteers"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 mb-2 transition-colors"
+          >
+            <ArrowLeft size={14} /> Back to Crew Roster
+          </Link>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+            Shift Allocation Console
+          </h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+            Assign active volunteers to specific campus event stations and check-in desks.
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Left Column: Volunteer Selection & Current Shifts */}
+        <div className="lg:col-span-5 space-y-6">
+          {/* Volunteer Select Box */}
+          <div className="p-6 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-4">
+            <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400">
+                <Users size={18} />
+              </div>
+              <h2 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+                1. Select Volunteer
               </h2>
-              <p className="text-sm text-gray-400 mt-0.5">
-                Select a volunteer and assign multiple events easily.
-              </p>
             </div>
-          </div>
 
-          <div
-            className="mt-1 mb-6 h-1 w-16 rounded-full"
-            style={{ background: BRAND.gradH }}
-          />
-
-          {/* Volunteer select */}
-          <div>
-            <label className="block text-xs font-bold text-gray-600 mb-1.5 tracking-wide uppercase">
-              Select Volunteer
-            </label>
-            <select
-              value={selectedVolunteer}
-              onChange={(e) => {
-                setSelectedVolunteer(e.target.value);
-                setSelectedEvents([]);
-              }}
-              className="w-full h-12 px-4 rounded-xl border-2 bg-[#faf8fc] text-sm outline-none transition-all duration-200"
-              style={{
-                borderColor: selectedVolunteer ? BRAND.coral : BRAND.border,
-                color: selectedVolunteer ? "#111" : "#9CA3AF",
-              }}
-              onFocus={(e) => {
-                e.target.style.borderColor = BRAND.coral;
-                e.target.style.boxShadow = "0 0 0 4px rgba(212,96,122,0.1)";
-              }}
-              onBlur={(e) => {
-                e.target.style.borderColor = selectedVolunteer
-                  ? BRAND.coral
-                  : BRAND.border;
-                e.target.style.boxShadow = "none";
-              }}
-            >
-              <option value="">— Select Volunteer —</option>
-              {volunteers.map((v) => (
-                <option key={v.id} value={v.id}>
-                  {v.name} ({v.email})
-                </option>
-              ))}
-            </select>
-
-            {fetchingAssigned && selectedVolunteer && (
-              <p
-                className="text-xs font-semibold mt-2 flex items-center gap-1.5"
-                style={{ color: BRAND.purple }}
-              >
-                <span
-                  className="animate-spin inline-block w-3 h-3 border-2 rounded-full"
-                  style={{
-                    borderColor: `${BRAND.purple} transparent transparent transparent`,
+            <div>
+              <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-2">
+                Active Volunteers
+              </label>
+              <div className="relative">
+                <select
+                  value={selectedVolunteer}
+                  onChange={(e) => {
+                    setSelectedVolunteer(e.target.value);
+                    setSelectedEvents([]);
                   }}
+                  disabled={loading}
+                  className="w-full px-3.5 py-2.5 text-sm rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 appearance-none font-medium"
+                >
+                  <option value="">{loading ? "-- Loading volunteers... --" : "-- Choose a volunteer --"}</option>
+                  {volunteers.map((vol) => (
+                    <option key={vol.id} value={vol.id}>
+                      {vol.name} ({vol.email})
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown
+                  size={16}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
                 />
-                Loading assigned events…
-              </p>
+              </div>
+            </div>
+
+            {selectedVolunteerObj && (
+              <div className="p-3.5 rounded-xl bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-200/60 dark:border-indigo-800/40 flex items-center gap-3">
+                <div className="size-10 rounded-xl bg-indigo-600 text-white font-bold text-xs flex items-center justify-center shrink-0">
+                  {selectedVolunteerObj.name.charAt(0).toUpperCase()}
+                </div>
+                <div className="min-w-0">
+                  <p className="font-bold text-xs text-slate-900 dark:text-white truncate">
+                    {selectedVolunteerObj.name}
+                  </p>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                    {selectedVolunteerObj.email}
+                  </p>
+                </div>
+              </div>
             )}
           </div>
-        </div>
 
-        {/* ── Main 2-col grid ─────────────────────────────────────────── */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Already assigned */}
-          <div
-            className="bg-white rounded-2xl border shadow-sm p-6 sm:p-8"
-            style={{ borderColor: BRAND.border }}
-          >
-            <h3 className="text-lg font-black text-gray-900 flex items-center gap-2 mb-1">
-              <BadgeCheck size={20} className="text-emerald-500" />
-              Already Assigned
-            </h3>
-            <p className="text-xs text-gray-400 mb-5">
-              These events are already assigned to this volunteer.
-            </p>
-
-            <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
-              {!selectedVolunteer ? (
-                <PlaceholderCard message="Select a volunteer to view assigned events." />
-              ) : fetchingAssigned ? (
-                <div className="space-y-3 animate-pulse">
-                  {[1, 2, 3, 4].map((i) => (
-                    <div
-                      key={i}
-                      className="p-4 rounded-xl border flex justify-between gap-3"
-                      style={{
-                        borderColor: BRAND.border,
-                        background: BRAND.purpleSurface,
-                      }}
-                    >
-                      <div className="space-y-2 flex-1">
-                        <div
-                          className="h-4 w-3/5 rounded"
-                          style={{ background: "#C4BBF0" }}
-                        />
-                        <div
-                          className="h-3 w-2/5 rounded"
-                          style={{ background: "#C4BBF0" }}
-                        />
-                      </div>
-                      <div
-                        className="h-6 w-20 rounded-full"
-                        style={{ background: "#C4BBF0" }}
-                      />
-                    </div>
-                  ))}
+          {/* Current Shifts */}
+          <div className="p-6 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400">
+                  <CalendarCheck size={18} />
                 </div>
-              ) : assignedEvents.length > 0 ? (
-                assignedEvents.map((event) => {
+                <h2 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+                  Currently Assigned Shifts
+                </h2>
+              </div>
+              <span className="text-xs font-bold text-slate-400">
+                {assignedEvents.length} Shifts
+              </span>
+            </div>
+
+            {fetchingAssigned ? (
+              <div className="py-8 text-center text-xs text-slate-400 animate-pulse">
+                Fetching current shifts...
+              </div>
+            ) : !selectedVolunteer ? (
+              <p className="text-xs text-slate-400 text-center py-6 italic">
+                Select a volunteer to view their assigned shifts
+              </p>
+            ) : assignedEvents.length === 0 ? (
+              <p className="text-xs text-slate-400 text-center py-6">
+                No active shifts assigned yet.
+              </p>
+            ) : (
+              <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                {assignedEvents.map((event) => {
                   const status = getEventStatus(event);
                   return (
                     <div
                       key={event._id}
-                      className="p-4 rounded-xl border flex justify-between items-start gap-3"
-                      style={{
-                        background: BRAND.purpleSurface,
-                        borderColor: "#C4BBF0",
-                      }}
+                      className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200/60 dark:border-slate-700/60 flex items-center justify-between gap-2"
                     >
-                      <div>
-                        <p className="font-black text-gray-900 text-sm">
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">
                           {event.name}
                         </p>
-                        <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
-                          <MapPin size={12} style={{ color: BRAND.coral }} />{" "}
-                          {event.venue}
+                        <p className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5">
+                          <MapPin size={10} /> {event.venue}
                         </p>
                       </div>
-                      <StatusPill status={status} />
+                      <span className="px-2 py-0.5 text-[9px] font-bold rounded-md uppercase bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200/50 dark:border-emerald-800/40">
+                        {status}
+                      </span>
                     </div>
                   );
-                })
-              ) : (
-                <PlaceholderCard message="No events assigned yet." />
-              )}
-            </div>
+                })}
+              </div>
+            )}
           </div>
+        </div>
 
-          {/* Available events */}
-          <div
-            className="bg-white rounded-2xl border shadow-sm p-6 sm:p-8"
-            style={{ borderColor: BRAND.border }}
-          >
-            <h3 className="text-lg font-black text-gray-900 flex items-center gap-2 mb-1">
-              <PlusCircle size={20} style={{ color: BRAND.coral }} />
-              Available Events
-            </h3>
-            <p className="text-xs text-gray-400 mb-4">
-              Select multiple events and assign them together.
-            </p>
+        {/* Right Column: Add Shifts */}
+        <div className="lg:col-span-7 space-y-4">
+          <div className="p-6 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col h-full">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
+                  <PlusCircle size={18} />
+                </div>
+                <div>
+                  <h2 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+                    2. Allocate New Shifts
+                  </h2>
+                  <p className="text-xs text-slate-400">
+                    Selected for assignment: <strong>{selectedEvents.length}</strong>
+                  </p>
+                </div>
+              </div>
 
-            {/* Search */}
-            <div
-              className="flex items-center gap-2 bg-[#faf8fc] px-4 py-3 rounded-xl border-2 mb-4 transition-all duration-200"
-              style={{ borderColor: searchEvent ? BRAND.coral : BRAND.border }}
-              onFocusCapture={(e) => {
-                e.currentTarget.style.borderColor = BRAND.coral;
-                e.currentTarget.style.boxShadow =
-                  "0 0 0 4px rgba(212,96,122,0.1)";
-              }}
-              onBlurCapture={(e) => {
-                e.currentTarget.style.borderColor = searchEvent
-                  ? BRAND.coral
-                  : BRAND.border;
-                e.currentTarget.style.boxShadow = "none";
-              }}
-            >
-              <Search size={16} style={{ color: BRAND.coral, flexShrink: 0 }} />
-              <input
-                value={searchEvent}
-                onChange={(e) => setSearchEvent(e.target.value)}
-                type="text"
-                placeholder="Search event by name or venue..."
-                className="w-full bg-transparent outline-none text-sm placeholder-gray-400"
-              />
+              {/* Search */}
+              <div className="relative sm:w-56">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={searchEvent}
+                  onChange={(e) => setSearchEvent(e.target.value)}
+                  placeholder="Filter available..."
+                  className="w-full pl-8 pr-3 py-1.5 text-xs rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                />
+              </div>
             </div>
 
             {/* List */}
-            <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+            <div className="flex-1 overflow-y-auto max-h-[460px] space-y-2.5 mt-4 pr-1">
               {!selectedVolunteer ? (
-                <PlaceholderCard message="Select a volunteer to assign events." />
-              ) : filteredAvailableEvents.length > 0 ? (
+                <div className="text-center py-16 text-slate-400">
+                  <Users size={32} className="mx-auto mb-2 opacity-40" />
+                  <p className="font-semibold text-xs text-slate-600 dark:text-slate-300">
+                    Select a volunteer on the left first
+                  </p>
+                  <p className="text-[11px] text-slate-400">
+                    Available shifts will populate once a volunteer is chosen.
+                  </p>
+                </div>
+              ) : filteredAvailableEvents.length === 0 ? (
+                <div className="text-center py-16 text-slate-400">
+                  <Layers size={32} className="mx-auto mb-2 opacity-40" />
+                  <p className="font-semibold text-xs text-slate-600 dark:text-slate-300">
+                    No unassigned events available
+                  </p>
+                  <p className="text-[11px] text-slate-400">
+                    This volunteer is already assigned to all matching events.
+                  </p>
+                </div>
+              ) : (
                 filteredAvailableEvents.map((event) => {
+                  const isChecked = selectedEvents.includes(event._id);
                   const status = getEventStatus(event);
-                  const isSelected = selectedEvents.includes(event._id);
-                  const disabled = status === "COMPLETED";
 
                   return (
-                    <label
+                    <div
                       key={event._id}
-                      className="flex items-start gap-3 p-3.5 rounded-xl border-2 transition-all duration-200 cursor-pointer"
-                      style={{
-                        background: isSelected ? BRAND.coralSurface : "#faf8fc",
-                        borderColor: isSelected ? BRAND.coral : BRAND.border,
-                        opacity: disabled ? 0.55 : 1,
-                        cursor: disabled ? "not-allowed" : "pointer",
-                      }}
+                      onClick={() => handleToggleEvent(event._id)}
+                      className={`p-3.5 rounded-xl border transition-all flex items-start gap-3 cursor-pointer ${
+                        isChecked
+                          ? "bg-indigo-50/70 dark:bg-indigo-950/40 border-indigo-400 dark:border-indigo-600 shadow-xs"
+                          : "bg-white dark:bg-slate-800/80 border-slate-200/80 dark:border-slate-700/80 hover:border-slate-300 dark:hover:border-slate-600"
+                      }`}
                     >
-                      <div
-                        className="mt-0.5 size-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-all duration-200"
-                        style={{
-                          background: isSelected ? BRAND.coral : "white",
-                          borderColor: isSelected ? BRAND.coral : "#C4BBF0",
-                        }}
-                      >
-                        {isSelected && (
-                          <CheckCircle2 size={12} className="text-white" />
-                        )}
-                      </div>
-
                       <input
                         type="checkbox"
-                        className="sr-only"
-                        checked={isSelected}
-                        disabled={disabled}
-                        onChange={() =>
-                          !disabled && handleToggleEvent(event._id)
-                        }
+                        checked={isChecked}
+                        onChange={() => {}}
+                        className="size-4 accent-indigo-600 mt-0.5 pointer-events-none"
                       />
 
-                      <div className="flex-1 flex justify-between items-start gap-2 min-w-0">
-                        <div className="min-w-0">
-                          <p className="font-bold text-gray-900 text-sm truncate">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <h4 className="font-bold text-xs text-slate-900 dark:text-white truncate">
                             {event.name}
-                          </p>
-                          <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
-                            <MapPin size={11} style={{ color: BRAND.coral }} />{" "}
-                            {event.venue}
-                          </p>
+                          </h4>
+                          <span
+                            className={`px-2 py-0.5 text-[9px] font-bold rounded-full uppercase ${
+                              status === "LIVE"
+                                ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400"
+                                : "bg-indigo-100 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-400"
+                            }`}
+                          >
+                            {status}
+                          </span>
                         </div>
-                        <StatusPill status={status} />
+
+                        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                          <span className="flex items-center gap-1">
+                            <Calendar size={11} className="text-slate-400" />
+                            {new Date(event.startTime).toLocaleDateString("en-IN", {
+                              day: "numeric",
+                              month: "short",
+                            })}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <MapPin size={11} className="text-slate-400" /> {event.venue}
+                          </span>
+                        </div>
                       </div>
-                    </label>
+                    </div>
                   );
                 })
-              ) : (
-                <PlaceholderCard message="No available events found." />
               )}
             </div>
 
-            {/* Selected tags */}
-            {selectedEventObjects.length > 0 && (
-              <div
-                className="mt-4 pt-4 border-t"
-                style={{ borderColor: BRAND.border }}
+            {/* Bottom Actions */}
+            <div className="pt-4 border-t border-slate-100 dark:border-slate-800 mt-4 flex items-center justify-between">
+              <span className="text-xs text-slate-500 dark:text-slate-400">
+                Ready to assign: <strong>{selectedEvents.length}</strong> shifts
+              </span>
+              <button
+                onClick={handleAssign}
+                disabled={assigning || !selectedEvents.length}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs text-white bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-600/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
               >
-                <p
-                  className="text-xs font-bold uppercase tracking-wide mb-2.5"
-                  style={{ color: BRAND.purple }}
-                >
-                  Selected ({selectedEventObjects.length})
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {selectedEventObjects.map((ev) => (
-                    <span
-                      key={ev._id}
-                      className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border"
-                      style={{
-                        background: BRAND.coralSurface,
-                        color: BRAND.coral,
-                        borderColor: "#F0BBCA",
-                      }}
-                    >
-                      <span className="truncate max-w-32">{ev.name}</span>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveSelected(ev._id)}
-                        className="hover:opacity-70 transition shrink-0"
-                      >
-                        <X size={11} />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Assign CTA */}
-            <button
-              onClick={handleAssign}
-              disabled={
-                assigning || !selectedVolunteer || !selectedEvents.length
-              }
-              className="mt-5 w-full h-12 rounded-xl font-black text-sm text-white flex items-center justify-center gap-2 transition-all duration-200 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100"
-              style={{
-                background:
-                  assigning || !selectedVolunteer || !selectedEvents.length
-                    ? "#E5E7EB"
-                    : BRAND.grad,
-                color:
-                  assigning || !selectedVolunteer || !selectedEvents.length
-                    ? "#9CA3AF"
-                    : "white",
-                boxShadow:
-                  !assigning && selectedVolunteer && selectedEvents.length
-                    ? "0 4px 16px rgba(212,96,122,0.35)"
-                    : "none",
-              }}
-              onMouseEnter={(e) => {
-                if (!assigning && selectedVolunteer && selectedEvents.length)
-                  e.currentTarget.style.boxShadow =
-                    "0 6px 22px rgba(83,74,183,0.45)";
-              }}
-              onMouseLeave={(e) => {
-                if (!assigning && selectedVolunteer && selectedEvents.length)
-                  e.currentTarget.style.boxShadow =
-                    "0 4px 16px rgba(212,96,122,0.35)";
-              }}
-            >
-              <CheckCircle2 size={17} />
-              {assigning
-                ? "Assigning…"
-                : `Assign ${selectedEvents.length > 0 ? `(${selectedEvents.length}) ` : ""}Events`}
-            </button>
+                <PlusCircle size={15} />
+                {assigning ? "Assigning Shifts..." : "Confirm & Assign Shifts"}
+              </button>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </DashboardLayout>
   );
-};
-
-export default AssignVolunteer;
+}

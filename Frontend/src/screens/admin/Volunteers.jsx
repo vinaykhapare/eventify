@@ -1,352 +1,330 @@
 import React, { useMemo, useState, useEffect } from "react";
 import axios from "axios";
+import { Link } from "react-router-dom";
 import {
-  Search, HandHeart, BadgeCheck, AlertTriangle,
-  Phone, Mail, Calendar, ClipboardList,
-  Filter, Download, XCircle, Zap, Loader2,
+  Search,
+  UserCheck,
+  UserPlus,
+  UserCog,
+  Phone,
+  Mail,
+  Zap,
+  Download,
+  Filter,
+  ArrowUpDown,
+  ChevronLeft,
+  ChevronRight,
+  ShieldCheck,
+  CalendarCheck,
 } from "lucide-react";
+import toast from "react-hot-toast";
+import DashboardLayout from "../../components/layout/DashboardLayout";
+import { useAuthContext } from "../../hooks/useAuthContext";
 
-const BRAND = {
-  coral:         "#D4607A",
-  purple:        "#6B5EC7",
-  indigo:        "#534AB7",
-  amber:         "#F5A623",
-  gradientText:  "linear-gradient(90deg, #D4607A 0%, #6B5EC7 100%)",
-  gradientBg:    "linear-gradient(135deg, #D4607A 0%, #6B5EC7 100%)",
-  coralSurface:  { bg: "#FDF0F3", border: "#F0BBCA", text: "#D4607A" },
-  purpleSurface: { bg: "#F3F0FD", border: "#C4BBF0", text: "#534AB7" },
-  amberSurface:  { bg: "#FEF6EC", border: "#F5D49A", text: "#C47A1A" },
-};
+const baseURL = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/+$/, "");
 
-const STATUS_CFG = {
-  Active:   { bg: "#EDFBF3", border: "#A3E6C0", text: "#1A7A4A", dot: "#2ECC7A",  icon: BadgeCheck },
-  Inactive: { bg: "#F5F5F7", border: "#DDDBE8", text: "#7B7396", dot: "#B0AABF",  icon: AlertTriangle },
-};
-
-const DUTY_COLORS = [
-  { bg: BRAND.purpleSurface.bg, border: BRAND.purpleSurface.border, text: BRAND.indigo },
-  { bg: BRAND.coralSurface.bg,  border: BRAND.coralSurface.border,  text: BRAND.coral  },
-  { bg: BRAND.amberSurface.bg,  border: BRAND.amberSurface.border,  text: BRAND.amberSurface.text },
-  { bg: "#EDF6FD", border: "#B3D9F5", text: "#1A6A9A" },
-];
-
-const dutyColor       = (name) => DUTY_COLORS[name.charCodeAt(0) % DUTY_COLORS.length];
-const avatarGradient  = (name) => name.charCodeAt(0) % 2 === 0 ? BRAND.gradientBg : "linear-gradient(135deg,#6B5EC7,#534AB7)";
-const getInitials     = (name) => name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase();
-
-// ─── Sub-components ───────────────────────────────────────────────────────────
-
-const Avatar = ({ name }) => (
-  <div style={{ width: 38, height: 38, borderRadius: 11, background: avatarGradient(name), display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: "0.75rem", fontWeight: 800, letterSpacing: "0.03em", flexShrink: 0, boxShadow: "0 2px 8px rgba(107,94,199,0.22)" }}>
-    {getInitials(name)}
-  </div>
-);
-
-const StatusBadge = ({ status }) => {
-  const cfg = STATUS_CFG[status] || STATUS_CFG.Inactive;
-  return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "4px 11px 4px 8px", borderRadius: 99, background: cfg.bg, border: `1px solid ${cfg.border}`, color: cfg.text, fontSize: "0.75rem", fontWeight: 700 }}>
-      <span style={{ width: 6, height: 6, borderRadius: "50%", background: cfg.dot, flexShrink: 0, display: "inline-block" }} />
-      {status}
-    </span>
-  );
-};
-
-const DutyPill = ({ duty }) => {
-  const c = dutyColor(duty);
-  return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "4px 10px", borderRadius: 8, background: c.bg, border: `1px solid ${c.border}`, color: c.text, fontSize: "0.78rem", fontWeight: 700, whiteSpace: "nowrap" }}>
-      <Zap size={11} />{duty}
-    </span>
-  );
-};
-
-const StatCard = ({ label, value, icon: Icon, gradient, surface }) => (
-  <div
-    style={{ background: "#fff", border: "1px solid #EEE9FA", borderRadius: 16, padding: "20px 22px", boxShadow: "0 2px 10px rgba(107,94,199,0.06)", display: "flex", flexDirection: "column", gap: 14, transition: "box-shadow 0.2s, transform 0.2s", cursor: "default" }}
-    onMouseEnter={(e) => { e.currentTarget.style.boxShadow = "0 6px 22px rgba(107,94,199,0.13)"; e.currentTarget.style.transform = "translateY(-2px)"; }}
-    onMouseLeave={(e) => { e.currentTarget.style.boxShadow = "0 2px 10px rgba(107,94,199,0.06)"; e.currentTarget.style.transform = "translateY(0)"; }}
-  >
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-      <span style={{ fontSize: "0.7rem", fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", color: "#9B8FC4" }}>{label}</span>
-      <div style={{ width: 34, height: 34, borderRadius: 10, background: surface.bg, border: `1px solid ${surface.border}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <Icon size={16} color={surface.text} />
-      </div>
-    </div>
-    <span style={{ fontSize: "2rem", fontFamily: "'Syne', sans-serif", fontWeight: 800, background: gradient, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text", lineHeight: 1 }}>
-      {value}
-    </span>
-  </div>
-);
-
-const GhostBtn = ({ children, onClick, disabled = false }) => (
-  <button onClick={onClick} disabled={disabled}
-    style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "9px 16px", borderRadius: 10, border: "1.5px solid #E8E3F5", background: "#fff", color: "#4B4568", fontSize: "0.82rem", fontWeight: 700, cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.45 : 1, transition: "background 0.15s", fontFamily: "inherit", whiteSpace: "nowrap" }}
-    onMouseEnter={(e) => { if (!disabled) e.currentTarget.style.background = "#F3F0FD"; }}
-    onMouseLeave={(e) => { e.currentTarget.style.background = "#fff"; }}
-  >
-    {children}
-  </button>
-);
-
-const SkeletonRow = ({ cols }) => (
-  <tr>
-    {Array.from({ length: cols }).map((_, i) => (
-      <td key={i} style={{ padding: "16px 20px" }}>
-        <div style={{ height: 12, width: [160, 180, 130, 110, 90, 70][i] || 100, borderRadius: 6, background: "linear-gradient(90deg,#F0EBF8 25%,#E8E3F5 50%,#F0EBF8 75%)", backgroundSize: "200% 100%", animation: "vl-shimmer 1.4s infinite" }} />
-      </td>
-    ))}
-  </tr>
-);
-
-// ─── Main Component ───────────────────────────────────────────────────────────
-const Volunteers = () => {
-  const baseURL = import.meta.env.VITE_API_URL;
-
+export default function Volunteers() {
+  const { auth } = useAuthContext();
+  const [volunteers, setVolunteers] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [volunteers,  setVolunteers]  = useState([]);
-  const [loading,     setLoading]     = useState(true);
-  const [error,       setError]       = useState("");
+  const [statusFilter, setStatusFilter] = useState("ALL");
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
 
-useEffect(() => {
-  const fetchVolunteers = async () => {
-    try {
-      setLoading(true);
-      setError("");
+  useEffect(() => {
+    const fetchVolunteers = async () => {
+      try {
+        setLoading(true);
+        const res = await axios.get(`${baseURL}/volunteering`, {
+          headers: { Authorization: `Bearer ${auth.token}` },
+        });
+        setVolunteers(Array.isArray(res.data) ? res.data : []);
+      } catch (err) {
+        console.error("Fetch volunteers error:", err);
+        toast.error("Failed to load volunteer roster");
+      } finally {
+        setLoading(false);
+      }
+    };
+    if (auth?.token) fetchVolunteers();
+  }, [auth]);
 
-      const auth = JSON.parse(localStorage.getItem("auth"));
-      const token = auth?.token;
-
-      const res = await axios.get(`${baseURL}/volunteering`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      setVolunteers(res.data);
-    } catch (err) {
-      setError(err.response?.data?.message || "Failed to load volunteers.");
-    } finally {
-      setLoading(false);
+  const filteredList = useMemo(() => {
+    let list = [...volunteers];
+    if (statusFilter !== "ALL") {
+      list = list.filter((v) => (v.status || "Active") === statusFilter);
     }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter(
+        (v) =>
+          v.name?.toLowerCase().includes(q) ||
+          v.email?.toLowerCase().includes(q) ||
+          v.assignedEvent?.toLowerCase().includes(q) ||
+          v.duty?.toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [volunteers, statusFilter, searchQuery]);
+
+  const totalPages = Math.ceil(filteredList.length / pageSize) || 1;
+  const paginatedList = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredList.slice(start, start + pageSize);
+  }, [filteredList, currentPage]);
+
+  const stats = useMemo(() => {
+    const total = volunteers.length;
+    const active = volunteers.filter((v) => v.status === "Active" || !v.status).length;
+    const assigned = volunteers.filter((v) => v.assignedEvent && v.assignedEvent !== "None").length;
+    return { total, active, assigned };
+  }, [volunteers]);
+
+  const handleExportCSV = () => {
+    if (!filteredList.length) {
+      toast.error("No volunteer records to export");
+      return;
+    }
+    const headers = ["Name,Email,Phone,Assigned Event,Duty,Status"];
+    const rows = filteredList.map(
+      (v) =>
+        `"${v.name || ""}","${v.email || ""}","${v.phone || ""}","${v.assignedEvent || "None"}","${v.duty || "General Staff"}","${v.status || "Active"}"`
+    );
+    const csvContent = "data:text/csv;charset=utf-8," + [headers, ...rows].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `volunteers-roster-${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success("Volunteer roster exported!");
   };
 
-  fetchVolunteers();
-}, [baseURL]);
-
-  const filteredVolunteers = useMemo(() => {
-    if (!searchQuery.trim()) return volunteers;
-    const q = searchQuery.toLowerCase();
-    return volunteers.filter(
-      (v) =>
-        v.name.toLowerCase().includes(q) ||
-        v.email.toLowerCase().includes(q) ||
-        v.phone.toLowerCase().includes(q) ||
-        v.assignedEvent.toLowerCase().includes(q) ||
-        v.duty.toLowerCase().includes(q) ||
-        v.status.toLowerCase().includes(q)
-    );
-  }, [searchQuery, volunteers]);
-
-  const counts = {
-    total:       volunteers.length,
-    active:      volunteers.filter((v) => v.status === "Active").length,
-    inactive:    volunteers.filter((v) => v.status === "Inactive").length,
-    assignments: volunteers.length,
+  const getInitials = (name = "") => {
+    const parts = name.trim().split(" ").filter(Boolean);
+    if (!parts.length) return "V";
+    if (parts.length === 1) return parts[0][0].toUpperCase();
+    return (parts[0][0] + parts[1][0]).toUpperCase();
   };
 
   return (
-    <>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Syne:wght@700;800&display=swap');
-        .vl-root * { box-sizing: border-box; font-family: 'DM Sans', sans-serif; }
-        .vl-row { transition: background 0.12s; }
-        .vl-row:hover { background: #F8F5FF !important; }
-        .vl-search-wrap:focus-within { border-color: ${BRAND.purple} !important; box-shadow: 0 0 0 3px rgba(107,94,199,0.12) !important; }
-        @keyframes vl-shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
-        @keyframes vl-spin    { to { transform: rotate(360deg); } }
-        @media (max-width: 640px) {
-          .vl-stats   { grid-template-columns: 1fr 1fr !important; }
-          .vl-topbar  { flex-direction: column !important; align-items: flex-start !important; }
-          .vl-controls{ flex-direction: column !important; align-items: stretch !important; }
-          .vl-legend  { display: none !important; }
-        }
-      `}</style>
-
-      <div className="vl-root" style={{ minHeight: "100vh", background: "linear-gradient(135deg,#F8F5FF 0%,#FDF0F3 40%,#F5F0FF 100%)" }}>
-
-        {/* ── Sticky Top Bar ── */}
-        <div style={{ position: "sticky", top: 0, zIndex: 40, background: "rgba(255,255,255,0.92)", backdropFilter: "blur(12px)", borderBottom: "1px solid #EEE9FA", padding: "14px 24px" }}>
-          <div className="vl-topbar" style={{ maxWidth: 1200, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
-            <div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
-                <div style={{ width: 28, height: 28, borderRadius: 8, background: BRAND.gradientBg, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 2px 8px rgba(212,96,122,0.3)" }}>
-                  <HandHeart size={14} color="#fff" />
-                </div>
-                <h2 style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: "1.25rem", letterSpacing: "-0.03em", background: BRAND.gradientText, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text", margin: 0, lineHeight: 1.2 }}>
-                  Volunteers
-                </h2>
-              </div>
-              <p style={{ fontSize: "0.78rem", color: "#9B8FC4", margin: 0, fontWeight: 500 }}>
-                Manage volunteer assignments and activity
-              </p>
-            </div>
-
-            <div className="vl-controls" style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div className="vl-search-wrap" style={{ display: "flex", alignItems: "center", gap: 8, background: "#FAFAFE", border: "1.5px solid #E8E3F5", borderRadius: 12, padding: "9px 14px", width: 260, transition: "border-color 0.2s, box-shadow 0.2s" }}>
-                <Search size={15} color="#9B8FC4" style={{ flexShrink: 0 }} />
-                <input
-                  type="text"
-                  placeholder="Search volunteers…"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  style={{ background: "transparent", border: "none", outline: "none", width: "100%", fontSize: "0.85rem", color: "#1a1033", fontFamily: "inherit" }}
-                />
-                {searchQuery && <XCircle size={15} color="#9B8FC4" style={{ cursor: "pointer", flexShrink: 0 }} onClick={() => setSearchQuery("")} />}
-              </div>
-              <GhostBtn><Filter size={14} />Filter</GhostBtn>
-              <button
-                style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 18px", borderRadius: 10, border: "none", background: BRAND.gradientBg, color: "#fff", fontSize: "0.82rem", fontWeight: 700, cursor: "pointer", boxShadow: "0 3px 12px rgba(212,96,122,0.28)", transition: "all 0.15s", fontFamily: "inherit" }}
-                onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.boxShadow = "0 6px 18px rgba(212,96,122,0.38)"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "0 3px 12px rgba(212,96,122,0.28)"; }}
-              >
-                <Download size={14} />Export
-              </button>
-            </div>
+    <DashboardLayout
+      searchPlaceholder="Search volunteers by name, duty, or event..."
+      onSearch={(q) => {
+        setSearchQuery(q);
+        setCurrentPage(1);
+      }}
+    >
+      {/* Top Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+            <UserCheck size={14} />
+            <span>Staff & Operations</span>
           </div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight mt-1">
+            Volunteer Crew
+          </h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+            Coordinate campus volunteers, assign gate shifts, and monitor check-in staff.
+          </p>
         </div>
 
-        {/* ── Page Content ── */}
-        <div style={{ maxWidth: 1200, margin: "0 auto", padding: "28px 20px 60px" }}>
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={handleExportCSV}
+            className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl font-semibold text-xs text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/60 shadow-xs transition-colors"
+          >
+            <Download size={14} /> Export CSV
+          </button>
+          <Link
+            to="/admin/assign-volunteer"
+            className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl font-semibold text-xs text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition-colors"
+          >
+            <UserCog size={14} /> Assign Shifts
+          </Link>
+          <Link
+            to="/admin/create-volunteer"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-xs text-white bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-600/20 transition-all"
+          >
+            <UserPlus size={14} /> Add Volunteer
+          </Link>
+        </div>
+      </div>
 
-          {/* Stats */}
-          <div className="vl-stats" style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 16, marginBottom: 28 }}>
-            <StatCard label="Total Volunteers" value={loading ? "—" : counts.total}       icon={HandHeart}     gradient={BRAND.gradientText}                            surface={BRAND.coralSurface} />
-            <StatCard label="Active"           value={loading ? "—" : counts.active}      icon={BadgeCheck}    gradient="linear-gradient(90deg,#1A7A4A,#2ECC7A)"         surface={{ bg: "#EDFBF3", border: "#A3E6C0", text: "#1A7A4A" }} />
-            <StatCard label="Inactive"         value={loading ? "—" : counts.inactive}    icon={AlertTriangle} gradient="linear-gradient(90deg,#9B8FC4,#534AB7)"          surface={{ bg: "#F5F5F7", border: "#DDDBE8", text: "#7B7396" }} />
-            <StatCard label="Assignments"      value={loading ? "—" : counts.assignments} icon={ClipboardList} gradient={`linear-gradient(90deg,${BRAND.amber},#C47A1A)`} surface={BRAND.amberSurface} />
-          </div>
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="p-4 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-800 shadow-xs">
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Crew</p>
+          <p className="text-2xl font-extrabold text-slate-900 dark:text-white mt-1.5">{stats.total}</p>
+        </div>
+        <div className="p-4 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-800 shadow-xs">
+          <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Active Staff</p>
+          <p className="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400 mt-1.5">{stats.active}</p>
+        </div>
+        <div className="p-4 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-800 shadow-xs">
+          <p className="text-xs font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider">On-Duty Shifts</p>
+          <p className="text-2xl font-extrabold text-purple-600 dark:text-purple-400 mt-1.5">{stats.assigned}</p>
+        </div>
+      </div>
 
-          {/* Table Card */}
-          <div style={{ background: "#fff", borderRadius: 20, border: "1px solid #EEE9FA", boxShadow: "0 2px 14px rgba(107,94,199,0.07)", overflow: "hidden" }}>
+      {/* Status Filter Chips */}
+      <div className="flex items-center gap-2">
+        {["ALL", "Active", "Inactive"].map((st) => (
+          <button
+            key={st}
+            onClick={() => {
+              setStatusFilter(st);
+              setCurrentPage(1);
+            }}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors ${
+              statusFilter === st
+                ? "bg-indigo-600 text-white shadow-xs"
+                : "bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
+            }`}
+          >
+            {st === "ALL" ? "All Volunteers" : st}
+          </button>
+        ))}
+      </div>
 
-            {/* Card Header */}
-            <div style={{ padding: "20px 24px", borderBottom: "1px solid #F0EBF8", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
-              <div>
-                <h3 style={{ fontSize: "1rem", fontWeight: 700, color: "#1a1033", margin: "0 0 3px", letterSpacing: "-0.01em" }}>Volunteer List</h3>
-                <p style={{ fontSize: "0.78rem", color: "#9B8FC4", margin: 0 }}>
-                  {loading
-                    ? "Loading…"
-                    : <><span style={{ color: BRAND.purple, fontWeight: 700 }}>{filteredVolunteers.length}</span> of <span style={{ color: "#1a1033", fontWeight: 700 }}>{volunteers.length}</span> volunteers{searchQuery && <span style={{ color: BRAND.purple, fontWeight: 700 }}> — filtered by "{searchQuery}"</span>}</>
-                  }
-                </p>
-              </div>
-              <div className="vl-legend" style={{ display: "flex", gap: 10 }}>
-                <StatusBadge status="Active" />
-                <StatusBadge status="Inactive" />
-              </div>
-            </div>
-
-            {/* Error state */}
-            {error && !loading && (
-              <div style={{ padding: "48px 24px", textAlign: "center" }}>
-                <div style={{ width: 48, height: 48, borderRadius: 14, background: BRAND.coralSurface.bg, border: `1px solid ${BRAND.coralSurface.border}`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 12px" }}>
-                  <AlertTriangle size={20} color={BRAND.coral} />
-                </div>
-                <p style={{ fontWeight: 700, color: "#1a1033", margin: "0 0 4px" }}>Failed to load</p>
-                <p style={{ fontSize: "0.83rem", color: "#9B8FC4", margin: 0 }}>{error}</p>
-              </div>
-            )}
-
-            {/* Table */}
-            {!error && (
-              <div style={{ overflowX: "auto" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 760 }}>
-                  <thead>
-                    <tr style={{ background: "#FAFAFE", borderBottom: "1px solid #F0EBF8" }}>
-                      {["Volunteer", "Contact", "Assigned Event", "Duty", "Joined", "Status"].map((h) => (
-                        <th key={h} style={{ padding: "12px 20px", textAlign: "left", fontSize: "0.7rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#9B8FC4", whiteSpace: "nowrap" }}>
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {/* Skeleton */}
-                    {loading && Array.from({ length: 3 }).map((_, i) => <SkeletonRow key={i} cols={6} />)}
-
-                    {/* Empty */}
-                    {!loading && filteredVolunteers.length === 0 && (
-                      <tr>
-                        <td colSpan={6} style={{ padding: "56px 24px", textAlign: "center" }}>
-                          <div style={{ width: 52, height: 52, borderRadius: 16, background: BRAND.purpleSurface.bg, border: `1px solid ${BRAND.purpleSurface.border}`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 14px" }}>
-                            <Search size={22} color={BRAND.purple} />
-                          </div>
-                          <p style={{ fontWeight: 700, color: "#1a1033", margin: "0 0 4px" }}>No results found</p>
-                          <p style={{ fontSize: "0.83rem", color: "#9B8FC4", margin: 0 }}>
-                            {searchQuery
-                              ? <>Nothing matched <span style={{ color: BRAND.coral, fontWeight: 700 }}>"{searchQuery}"</span></>
-                              : "No volunteers have been assigned yet."}
+      {/* Modern SaaS Table */}
+      <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="border-b border-slate-200/80 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                <th className="py-3.5 px-4">Volunteer</th>
+                <th className="py-3.5 px-4">Contact</th>
+                <th className="py-3.5 px-4">Assigned Shift</th>
+                <th className="py-3.5 px-4">Role / Duty</th>
+                <th className="py-3.5 px-4">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-xs">
+              {loading ? (
+                [...Array(5)].map((_, idx) => (
+                  <tr key={idx} className="animate-pulse">
+                    <td className="py-4 px-4">
+                      <div className="flex items-center gap-3">
+                        <div className="size-9 rounded-xl bg-slate-200 dark:bg-slate-700" />
+                        <div className="space-y-1.5">
+                          <div className="h-3 w-28 bg-slate-200 dark:bg-slate-700 rounded-md" />
+                          <div className="h-2.5 w-36 bg-slate-100 dark:bg-slate-700/60 rounded-md" />
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-4 px-4"><div className="h-3 w-32 bg-slate-200 dark:bg-slate-700 rounded-md" /></td>
+                    <td className="py-4 px-4"><div className="h-3 w-28 bg-slate-200 dark:bg-slate-700 rounded-md" /></td>
+                    <td className="py-4 px-4"><div className="h-5 w-20 bg-slate-200 dark:bg-slate-700 rounded-full" /></td>
+                    <td className="py-4 px-4"><div className="h-5 w-16 bg-slate-200 dark:bg-slate-700 rounded-full" /></td>
+                  </tr>
+                ))
+              ) : paginatedList.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="py-12 text-center text-slate-400">
+                    <UserCheck size={32} className="mx-auto mb-2 opacity-40" />
+                    <p className="font-semibold text-slate-600 dark:text-slate-300">No volunteers registered yet</p>
+                    <p className="text-xs text-slate-400 mt-0.5">Click "Add Volunteer" above to create volunteer credentials.</p>
+                  </td>
+                </tr>
+              ) : (
+                paginatedList.map((v, idx) => (
+                  <tr
+                    key={v.id || v._id || idx}
+                    className="hover:bg-slate-50/80 dark:hover:bg-slate-700/30 transition-colors"
+                  >
+                    {/* Volunteer */}
+                    <td className="py-3.5 px-4">
+                      <div className="flex items-center gap-3">
+                        <div className="size-9 rounded-xl bg-gradient-to-tr from-purple-500 to-indigo-600 text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-xs">
+                          {getInitials(v.name)}
+                        </div>
+                        <div>
+                          <p className="font-bold text-slate-900 dark:text-white leading-tight">
+                            {v.name}
                           </p>
-                        </td>
-                      </tr>
-                    )}
+                          <p className="text-[11px] text-slate-400 font-mono mt-0.5">
+                            {v.email}
+                          </p>
+                        </div>
+                      </div>
+                    </td>
 
-                    {/* Rows */}
-                    {!loading && filteredVolunteers.map((v, i) => (
-                      <tr key={v.id} className="vl-row" style={{ borderBottom: i < filteredVolunteers.length - 1 ? "1px solid #F5F2FC" : "none", background: "#fff" }}>
-                        <td style={{ padding: "14px 20px" }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
-                            <Avatar name={v.name} />
-                            <div>
-                              <p style={{ fontWeight: 700, fontSize: "0.88rem", color: "#1a1033", margin: "0 0 2px", letterSpacing: "-0.01em" }}>{v.name}</p>
-                              <p style={{ fontSize: "0.73rem", color: "#9B8FC4", margin: 0 }}>#{v.id.toString().slice(-4).toUpperCase()}</p>
-                            </div>
-                          </div>
-                        </td>
-                        <td style={{ padding: "14px 20px" }}>
-                          <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                            <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.8rem", color: "#4B4568" }}><Mail size={13} color="#9B8FC4" />{v.email}</span>
-                            <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.8rem", color: "#4B4568" }}><Phone size={13} color="#9B8FC4" />{v.phone}</span>
-                          </div>
-                        </td>
-                        <td style={{ padding: "14px 20px" }}>
-                          <span style={{ display: "inline-block", padding: "4px 10px", borderRadius: 8, background: BRAND.purpleSurface.bg, border: `1px solid ${BRAND.purpleSurface.border}`, color: BRAND.indigo, fontSize: "0.8rem", fontWeight: 700, whiteSpace: "nowrap" }}>
-                            {v.assignedEvent}
+                    {/* Contact */}
+                    <td className="py-3.5 px-4 text-slate-500 dark:text-slate-400">
+                      <div className="flex flex-col gap-0.5 text-[11px]">
+                        {v.phone && (
+                          <span className="flex items-center gap-1 font-mono">
+                            <Phone size={11} className="text-slate-400" /> {v.phone}
                           </span>
-                        </td>
-                        <td style={{ padding: "14px 20px" }}>
-                          <DutyPill duty={v.duty} />
-                        </td>
-                        <td style={{ padding: "14px 20px" }}>
-                          <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.8rem", color: "#7B6E9A", whiteSpace: "nowrap" }}><Calendar size={13} color="#9B8FC4" />{v.joinedAt}</span>
-                        </td>
-                        <td style={{ padding: "14px 20px" }}>
-                          <StatusBadge status={v.status} />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                        )}
+                        <span className="flex items-center gap-1">
+                          <Mail size={11} className="text-slate-400" /> {v.email}
+                        </span>
+                      </div>
+                    </td>
 
-            {/* Footer */}
-            <div style={{ padding: "14px 22px", borderTop: "1px solid #F0EBF8", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
-              <span style={{ fontSize: "0.78rem", color: "#9B8FC4", fontWeight: 500, display: "flex", alignItems: "center", gap: 6 }}>
-                {loading
-                  ? <><Loader2 size={13} color={BRAND.purple} style={{ animation: "vl-spin 1s linear infinite" }} />Loading volunteers…</>
-                  : <>Showing <span style={{ color: BRAND.purple, fontWeight: 700, margin: "0 3px" }}>{filteredVolunteers.length}</span> of <span style={{ color: "#1a1033", fontWeight: 700, margin: "0 3px" }}>{volunteers.length}</span> volunteers</>
-                }
-              </span>
-              <div style={{ display: "flex", gap: 8 }}>
-                <GhostBtn disabled>← Previous</GhostBtn>
-                <GhostBtn>Next →</GhostBtn>
-              </div>
-            </div>
+                    {/* Shift */}
+                    <td className="py-3.5 px-4 font-semibold text-slate-800 dark:text-slate-200">
+                      {v.assignedEvent && v.assignedEvent !== "None" ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/40">
+                          <CalendarCheck size={12} /> {v.assignedEvent}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400 text-xs italic">Unassigned</span>
+                      )}
+                    </td>
+
+                    {/* Duty */}
+                    <td className="py-3.5 px-4">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-semibold bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
+                        <Zap size={11} className="text-amber-500" /> {v.duty || "General Operations"}
+                      </span>
+                    </td>
+
+                    {/* Status */}
+                    <td className="py-3.5 px-4">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60">
+                        <span className="size-1.5 rounded-full bg-emerald-500" />
+                        {v.status || "Active"}
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between px-4 py-3 border-t border-slate-200/80 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-400">
+          <span>
+            Total: <strong>{filteredList.length}</strong> volunteers
+          </span>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <span className="px-2 font-medium">
+              {currentPage} / {totalPages}
+            </span>
+            <button
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronRight size={16} />
+            </button>
           </div>
         </div>
       </div>
-    </>
+    </DashboardLayout>
   );
-};
-
-export default Volunteers;
+}

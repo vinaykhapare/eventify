@@ -1,20 +1,28 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { Search, XCircle, AlertCircle, RotateCcw } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Search,
+  XCircle,
+  AlertCircle,
+  RotateCcw,
+  SlidersHorizontal,
+  Compass,
+  CalendarDays,
+  Ticket,
+  Zap,
+} from "lucide-react";
+import DashboardLayout from "../../components/layout/DashboardLayout";
 import EventCard from "../../components/participant/EventCard";
-import { useAuthContext } from "../../../hooks/useAuthContext";
+import { useAuthContext } from "../../hooks/useAuthContext";
 
-const BRAND = {
-  grad:    "linear-gradient(90deg, #D4607A 0%, #8B5CB7 50%, #534AB7 100%)",
-  gradBr:  "linear-gradient(135deg, #D4607A 0%, #8B5CB7 50%, #534AB7 100%)",
-  coral:   "#D4607A",
-  purple:  "#534AB7",
-};
+const baseURL = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/+$/, "");
 
-const EventListings = () => {
-  const baseURL = import.meta.env.VITE_API_URL;
-  const [events, setEvents]   = useState([]);
+export default function EventListings() {
+  const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch]   = useState("");
+  const [search, setSearch] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("All");
+  const [sortBy, setSortBy] = useState("upcoming");
   const { auth } = useAuthContext();
 
   useEffect(() => {
@@ -24,6 +32,9 @@ const EventListings = () => {
         const res = await fetch(`${baseURL}/events`, {
           headers: { Authorization: `Bearer ${auth?.token}` },
         });
+        if (!res.ok) {
+          throw new Error(`Failed to fetch events: ${res.statusText}`);
+        }
         const data = await res.json();
         setEvents(data?.events || []);
       } catch (error) {
@@ -33,156 +44,221 @@ const EventListings = () => {
       }
     };
     if (auth?.token) fetchEvents();
-  }, [auth]);
+  }, [auth?.token]);
+
+  const categories = [
+    "All",
+    "Hackathon",
+    "Workshop",
+    "Tech Talk",
+    "Robotics",
+    "Cultural",
+  ];
 
   const filteredEvents = useMemo(() => {
-    if (!search.trim()) return events;
-    const q = search.toLowerCase().trim();
-    return events.filter(e =>
-      (e.name  || "").toLowerCase().includes(q) ||
-      (e.value || "").toLowerCase().includes(q) ||
-      (e.title || "").toLowerCase().includes(q)
-    );
-  }, [events, search]);
+    let result = events;
 
-  const clearFilters = () => setSearch("");
+    // Search query filter
+    if (search.trim()) {
+      const q = search.toLowerCase().trim();
+      result = result.filter(
+        (e) =>
+          (e.name || "").toLowerCase().includes(q) ||
+          (e.venue || "").toLowerCase().includes(q) ||
+          (e.description || "").toLowerCase().includes(q)
+      );
+    }
+
+    // Category filter
+    if (selectedCategory !== "All") {
+      const cat = selectedCategory.toLowerCase();
+      result = result.filter(
+        (e) =>
+          (e.name || "").toLowerCase().includes(cat) ||
+          (e.description || "").toLowerCase().includes(cat)
+      );
+    }
+
+    // Sorting
+    if (sortBy === "free") {
+      result = [...result].sort((a, b) => (a.entryFee || 0) - (b.entryFee || 0));
+    } else if (sortBy === "popular") {
+      result = [...result].sort(
+        (a, b) => (b.registrationsCount || 0) - (a.registrationsCount || 0)
+      );
+    } else {
+      // Upcoming (default)
+      result = [...result].sort(
+        (a, b) => new Date(a.startTime) - new Date(b.startTime)
+      );
+    }
+
+    return result;
+  }, [events, search, selectedCategory, sortBy]);
+
+  const clearFilters = () => {
+    setSearch("");
+    setSelectedCategory("All");
+    setSortBy("upcoming");
+  };
 
   return (
-    <div className="min-h-screen bg-[#faf8fc]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 py-6 sm:py-10">
-
-        {/* ── Header ──────────────────────────────────────────────────────── */}
-        <div className="text-center space-y-3 mb-10">
-          <h2
-            className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight"
-            style={{
-              background: BRAND.grad,
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-              backgroundClip: "text",
-            }}
-          >
-            Explore Events
-          </h2>
-          <p className="text-gray-500 text-sm sm:text-base max-w-2xl mx-auto leading-relaxed">
-            Discover workshops, hackathons, seminars and competitions tailored for your career growth.
+    <DashboardLayout
+      searchPlaceholder="Search campus events..."
+      onSearch={(val) => setSearch(val)}
+    >
+      {/* ── Page Header ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2 text-xs font-semibold text-indigo-600 dark:text-indigo-400 tracking-wide uppercase">
+            <Compass size={14} />
+            <span>Discover Events</span>
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-heading font-extrabold text-slate-900 dark:text-white mt-1">
+            Explore Campus Gatherings
+          </h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+            RSVP for hackathons, engineering summits, tech workshops, and competitions.
           </p>
-          {/* Accent underline */}
-          <div className="flex justify-center pt-1">
-            <div className="h-1 w-20 rounded-full" style={{ background: BRAND.grad }} />
+        </div>
+
+        {/* Sort Dropdown */}
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          <SlidersHorizontal size={15} className="text-slate-400" />
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            className="px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 outline-none shadow-2xs cursor-pointer focus:border-indigo-500"
+          >
+            <option value="upcoming">Sort by: Date (Soonest)</option>
+            <option value="popular">Sort by: Most Popular</option>
+            <option value="free">Sort by: Free First</option>
+          </select>
+        </div>
+      </div>
+
+      {/* ── Visual Statistics Strip ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <div className="p-4 rounded-2xl bg-white dark:bg-[#1E293B] border border-slate-200/80 dark:border-slate-800 shadow-2xs flex items-center gap-3">
+          <div className="p-2.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 shrink-0">
+            <CalendarDays size={18} />
+          </div>
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total Gatherings</p>
+            <p className="text-lg font-heading font-extrabold text-slate-900 dark:text-white leading-tight">
+              {events.length} Events
+            </p>
           </div>
         </div>
 
-        {/* ── Search Card ─────────────────────────────────────────────────── */}
-        <div className="bg-white border border-[#EDD9F0] rounded-2xl p-4 sm:p-6 shadow-sm">
-          <div className="flex flex-col lg:flex-row gap-4 items-stretch lg:items-center">
-            {/* Input */}
-            <div className="relative w-full">
-              <Search
-                className="absolute left-4 top-1/2 -translate-y-1/2"
-                size={17}
-                style={{ color: BRAND.coral }}
-              />
-              <input
-                type="text"
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                placeholder="Search events by name..."
-                className="w-full pl-11 pr-11 py-3 rounded-xl border-2 bg-[#faf8fc] text-sm outline-none transition-all duration-200"
-                style={{
-                  borderColor: search.trim() ? BRAND.coral : "#EDD9F0",
-                }}
-                onFocus={e  => { e.target.style.borderColor = BRAND.coral; e.target.style.boxShadow = "0 0 0 4px rgba(212,96,122,0.1)"; }}
-                onBlur={e   => { e.target.style.borderColor = search.trim() ? BRAND.coral : "#EDD9F0"; e.target.style.boxShadow = "none"; }}
-              />
-              {search.trim() && (
-                <button
-                  onClick={clearFilters}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition"
-                >
-                  <XCircle size={17}/>
-                </button>
-              )}
-            </div>
+        <div className="p-4 rounded-2xl bg-white dark:bg-[#1E293B] border border-slate-200/80 dark:border-slate-800 shadow-2xs flex items-center gap-3">
+          <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 shrink-0">
+            <Ticket size={18} />
+          </div>
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Free Access</p>
+            <p className="text-lg font-heading font-extrabold text-slate-900 dark:text-white leading-tight">
+              {events.filter((e) => !e.entryFee || e.entryFee === 0).length} Passes
+            </p>
+          </div>
+        </div>
 
-            {/* Reset button */}
+        <div className="p-4 rounded-2xl bg-white dark:bg-[#1E293B] border border-slate-200/80 dark:border-slate-800 shadow-2xs hidden sm:flex items-center gap-3">
+          <div className="p-2.5 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 shrink-0">
+            <Zap size={18} />
+          </div>
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Gate Verification</p>
+            <p className="text-lg font-heading font-extrabold text-slate-900 dark:text-white leading-tight">
+              Sub-second QR
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Filter Bar & Category Pills ── */}
+      <div className="space-y-3">
+        {/* Category Pills */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+          {categories.map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setSelectedCategory(cat)}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-150 ${
+                selectedCategory === cat
+                  ? "bg-indigo-600 text-white shadow-xs shadow-indigo-500/20"
+                  : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-750"
+              }`}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+
+        {/* Search status & reset */}
+        <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+          <p>
+            Showing <span className="font-bold text-slate-900 dark:text-white">{filteredEvents.length}</span> events
+          </p>
+          {(search || selectedCategory !== "All" || sortBy !== "upcoming") && (
             <button
               onClick={clearFilters}
-              className="w-full lg:w-auto px-6 py-3 rounded-xl text-white text-sm font-black flex items-center justify-center gap-2 transition-all duration-200 active:scale-95"
-              style={{ background: BRAND.gradBr, boxShadow: "0 4px 16px rgba(212,96,122,0.3)" }}
-              onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 6px 20px rgba(83,74,183,0.4)"; }}
-              onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 4px 16px rgba(212,96,122,0.3)"; }}
+              className="inline-flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400 font-semibold hover:underline"
             >
-              <RotateCcw size={16}/> Reset
+              <RotateCcw size={12} />
+              <span>Reset filters</span>
             </button>
-          </div>
-
-          {/* Result count */}
-          <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm">
-            <p className="text-gray-500">
-              Showing{" "}
-              <span className="font-black text-gray-900">{filteredEvents.length}</span>{" "}
-              events
-            </p>
-            {search.trim() ? (
-              <span className="inline-flex items-center gap-1.5 font-bold text-xs" style={{ color: BRAND.coral }}>
-                <Search size={13}/> Search applied
-              </span>
-            ) : (
-              <span className="text-gray-400 text-xs font-medium">Browse all available events</span>
-            )}
-          </div>
-        </div>
-
-        {/* ── Events Grid ─────────────────────────────────────────────────── */}
-        <div className="mt-10 sm:mt-12">
-          {loading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 sm:gap-8 animate-pulse">
-              {[...Array(8)].map((_, i) => (
-                <div key={i} className="bg-white border border-[#EDD9F0] rounded-2xl overflow-hidden shadow-sm">
-                  <div className="h-36 bg-[#F3F0FD]" />
-                  <div className="p-4 space-y-3">
-                    <div className="h-4 w-3/4 bg-[#F3F0FD] rounded" />
-                    <div className="h-4 w-1/2 bg-[#F3F0FD] rounded" />
-                    <div className="flex gap-2 mt-3">
-                      <div className="h-8 w-20 bg-[#F3F0FD] rounded-xl" />
-                      <div className="h-8 w-20 bg-[#F3F0FD] rounded-xl" />
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : filteredEvents.length === 0 ? (
-            <div className="text-center py-16 sm:py-20 bg-white rounded-2xl shadow-sm border border-[#EDD9F0]">
-              <div
-                className="mx-auto size-14 rounded-2xl flex items-center justify-center border mb-5"
-                style={{ background: BRAND.purpleSurface, borderColor: "#C4BBF0" }}
-              >
-                <AlertCircle size={24} style={{ color: BRAND.purple }}/>
-              </div>
-              <h3 className="text-xl sm:text-2xl font-black text-gray-900">No events found</h3>
-              <p className="text-gray-500 mt-2 text-sm">Try searching with a different keyword.</p>
-              <button
-                onClick={clearFilters}
-                className="mt-6 px-6 py-3 rounded-xl text-white font-black text-sm inline-flex items-center gap-2 transition-all duration-200 active:scale-95"
-                style={{ background: BRAND.gradBr, boxShadow: "0 4px 16px rgba(212,96,122,0.3)" }}
-                onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 6px 20px rgba(83,74,183,0.4)"; }}
-                onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 4px 16px rgba(212,96,122,0.3)"; }}
-              >
-                <RotateCcw size={16}/> Reset Search
-              </button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 sm:gap-8">
-              {filteredEvents.map(event => (
-                <EventCard key={event._id} event={event} />
-              ))}
-            </div>
           )}
         </div>
       </div>
-    </div>
-  );
-};
 
-export default EventListings;
+      {/* ── Events Grid ── */}
+      <div>
+        {loading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {[...Array(8)].map((_, i) => (
+              <div
+                key={i}
+                className="rounded-2xl bg-white dark:bg-[#1E293B] border border-slate-200/80 dark:border-slate-800 overflow-hidden shadow-xs animate-pulse"
+              >
+                <div className="h-48 bg-slate-100 dark:bg-slate-800" />
+                <div className="p-5 space-y-3">
+                  <div className="h-4 w-3/4 bg-slate-200 dark:bg-slate-700 rounded" />
+                  <div className="h-3 w-1/2 bg-slate-100 dark:bg-slate-800 rounded" />
+                  <div className="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full mt-4" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : filteredEvents.length === 0 ? (
+          <div className="p-12 text-center rounded-2xl bg-white dark:bg-[#1E293B] border border-slate-200/80 dark:border-slate-800 shadow-xs max-w-lg mx-auto space-y-4">
+            <div className="size-14 rounded-2xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mx-auto">
+              <AlertCircle size={28} />
+            </div>
+            <div>
+              <h3 className="font-heading font-bold text-lg text-slate-900 dark:text-white">
+                No events found
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                We couldn't find any events matching "{search || selectedCategory}". Try searching for another term.
+              </p>
+            </div>
+            <button
+              onClick={clearFilters}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs transition-colors"
+            >
+              <RotateCcw size={14} />
+              <span>Show All Events</span>
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {filteredEvents.map((event) => (
+              <EventCard key={event._id} event={event} />
+            ))}
+          </div>
+        )}
+      </div>
+    </DashboardLayout>
+  );
+}

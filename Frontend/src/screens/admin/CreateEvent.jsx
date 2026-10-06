@@ -1,230 +1,42 @@
 import { useRef, useState } from "react";
 import axios from "axios";
-
+import toast from "react-hot-toast";
+import { Link, useNavigate } from "react-router-dom";
 import {
   Info,
   UploadCloud,
   Calendar,
-  CalendarX,
   MapPin,
   Users,
-  ChevronDown,
   Save,
   Plus,
   Trash2,
-  Wallet,
-  ClipboardList,
   Trophy,
   CheckCircle2,
   X,
   Sparkles,
+  ArrowLeft,
+  IndianRupee,
+  ClipboardList,
+  AlertCircle,
+  Eye,
 } from "lucide-react";
+import DashboardLayout from "../../components/layout/DashboardLayout";
+import { useAuthContext } from "../../hooks/useAuthContext";
 
-// ─── Brand token (mirrors your brand.js) ─────────────────────────────────────
-const BRAND = {
-  coral: "#D4607A",
-  purple: "#6B5EC7",
-  indigo: "#534AB7",
-  amber: "#F5A623",
-  gradientText: "linear-gradient(90deg, #D4607A 0%, #6B5EC7 100%)",
-  gradientBg: "linear-gradient(135deg, #D4607A 0%, #6B5EC7 100%)",
-  coralSurface: { bg: "#FDF0F3", border: "#F0BBCA", text: "#D4607A" },
-  purpleSurface: { bg: "#F3F0FD", border: "#C4BBF0", text: "#534AB7" },
-  amberSurface: { bg: "#FEF6EC", border: "#F5D49A", text: "#C47A1A" },
-};
+const baseURL = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/+$/, "");
+const UPLOAD_API_URL = `${baseURL}/uploads/banner`;
+const CREATE_EVENT_API_URL = `${baseURL}/events`;
 
-// ─── Reusable styled primitives ───────────────────────────────────────────────
-
-const SectionCard = ({ children, style = {} }) => (
-  <div
-    style={{
-      background: "#fff",
-      borderRadius: 20,
-      border: "1px solid #F0EBF8",
-      boxShadow: "0 2px 12px 0 rgba(107,94,199,0.06)",
-      padding: "32px",
-      marginBottom: 24,
-      ...style,
-    }}
-  >
-    {children}
-  </div>
-);
-
-const SectionHeader = ({ icon: Icon, title, required, accentColor = BRAND.coral }) => (
-  <div
-    style={{
-      display: "flex",
-      alignItems: "center",
-      gap: 12,
-      paddingBottom: 20,
-      marginBottom: 24,
-      borderBottom: `2px solid`,
-      borderImage: `${BRAND.gradientBg} 1`,
-    }}
-  >
-    <div
-      style={{
-        width: 38,
-        height: 38,
-        borderRadius: 10,
-        background: BRAND.purpleSurface.bg,
-        border: `1px solid ${BRAND.purpleSurface.border}`,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        flexShrink: 0,
-      }}
-    >
-      <Icon size={18} color={BRAND.purple} />
-    </div>
-    <h2
-      style={{
-        fontSize: "1.15rem",
-        fontWeight: 700,
-        color: "#1a1033",
-        letterSpacing: "-0.02em",
-        margin: 0,
-      }}
-    >
-      {title}
-      {required && (
-        <span style={{ color: BRAND.coral, marginLeft: 4 }}>*</span>
-      )}
-    </h2>
-  </div>
-);
-
-const FieldLabel = ({ children, required }) => (
-  <label
-    style={{
-      display: "block",
-      fontSize: "0.78rem",
-      fontWeight: 700,
-      color: "#4B4568",
-      letterSpacing: "0.04em",
-      textTransform: "uppercase",
-      marginBottom: 8,
-    }}
-  >
-    {children}
-    {required && (
-      <span style={{ color: BRAND.coral, marginLeft: 4 }}>*</span>
-    )}
-  </label>
-);
-
-const baseInputStyle = {
-  width: "100%",
-  height: 48,
-  padding: "0 16px",
-  borderRadius: 12,
-  border: "1.5px solid #E8E3F5",
-  background: "#FAFAFE",
-  color: "#1a1033",
-  fontSize: "0.9rem",
-  outline: "none",
-  transition: "border-color 0.2s, box-shadow 0.2s, background 0.2s",
-  boxSizing: "border-box",
-  fontFamily: "inherit",
-};
-
-const errorInputStyle = {
-  ...baseInputStyle,
-  borderColor: BRAND.coral,
-  background: BRAND.coralSurface.bg,
-};
-
-const FieldError = ({ msg }) =>
-  msg ? (
-    <p
-      style={{
-        fontSize: "0.78rem",
-        color: BRAND.coral,
-        marginTop: 6,
-        display: "flex",
-        alignItems: "center",
-        gap: 4,
-      }}
-    >
-      ⚠ {msg}
-    </p>
-  ) : null;
-
-const InputWithIcon = ({ icon: Icon, error, style: extra = {}, ...props }) => (
-  <div style={{ position: "relative" }}>
-    <div
-      style={{
-        position: "absolute",
-        inset: "0 auto 0 0",
-        paddingLeft: 14,
-        display: "flex",
-        alignItems: "center",
-        pointerEvents: "none",
-      }}
-    >
-      <Icon size={16} color={error ? BRAND.coral : "#9B8FC4"} />
-    </div>
-    <input
-      style={{
-        ...(error ? errorInputStyle : baseInputStyle),
-        paddingLeft: 42,
-        ...extra,
-      }}
-      {...props}
-    />
-  </div>
-);
-
-const GhostButton = ({ children, onClick, type = "button", danger = false, disabled = false }) => (
-  <button
-    type={type}
-    onClick={onClick}
-    disabled={disabled}
-    style={{
-      display: "inline-flex",
-      alignItems: "center",
-      gap: 6,
-      padding: "10px 18px",
-      borderRadius: 10,
-      border: `1.5px solid ${danger ? "#F0BBCA" : "#E8E3F5"}`,
-      background: danger ? BRAND.coralSurface.bg : BRAND.purpleSurface.bg,
-      color: danger ? BRAND.coral : BRAND.purple,
-      fontSize: "0.83rem",
-      fontWeight: 700,
-      cursor: disabled ? "not-allowed" : "pointer",
-      transition: "all 0.15s",
-      opacity: disabled ? 0.5 : 1,
-      fontFamily: "inherit",
-    }}
-    onMouseEnter={(e) => {
-      if (!disabled) {
-        e.currentTarget.style.background = danger ? "#F7D6DF" : "#EAE5FA";
-        e.currentTarget.style.transform = "translateY(-1px)";
-      }
-    }}
-    onMouseLeave={(e) => {
-      e.currentTarget.style.background = danger ? BRAND.coralSurface.bg : BRAND.purpleSurface.bg;
-      e.currentTarget.style.transform = "translateY(0)";
-    }}
-  >
-    {children}
-  </button>
-);
-
-// ─── Main Component ───────────────────────────────────────────────────────────
-
-const CreateEvent = () => {
-  const baseURL = import.meta.env.VITE_API_URL;
-  const UPLOAD_API_URL = `${baseURL}/uploads/banner`;
-  const CREATE_EVENT_API_URL = `${baseURL}/events`;
-
+export default function CreateEvent() {
+  const { auth } = useAuthContext();
+  const navigate = useNavigate();
   const fileInputRef = useRef(null);
 
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [bannerPreview, setBannerPreview] = useState("");
-  const [openPreview, setOpenPreview] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const [formData, setFormData] = useState({
     eventName: "",
@@ -236,10 +48,10 @@ const CreateEvent = () => {
     venue: "",
     capacity: "",
     entryFee: "",
-    teamSizeMin: "",
-    teamSizeMax: "",
+    teamSizeMin: "1",
+    teamSizeMax: "1",
     rules: [""],
-    prizes: [{ position: "", amount: "", perks: "" }],
+    prizes: [{ position: "1st Place", amount: "", perks: "Certificate + Trophy" }],
     bannerUrl: "",
   });
 
@@ -251,15 +63,15 @@ const CreateEvent = () => {
     if (errors[name]) setErrors((prev) => ({ ...prev, [name]: "" }));
   };
 
-  // UPLOAD IMAGE TO BACKEND
   const handleFileChange = async (e) => {
-    const file = e.target.files[0];
+    const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 3 * 1024 * 1024) {
-      setErrors((prev) => ({ ...prev, banner: "File size must be less than 3MB" }));
+    if (file.size > 5 * 1024 * 1024) {
+      setErrors((prev) => ({ ...prev, banner: "File size must be under 5MB" }));
       return;
     }
     setErrors((prev) => ({ ...prev, banner: "" }));
+
     try {
       setUploading(true);
       setUploadProgress(0);
@@ -269,11 +81,9 @@ const CreateEvent = () => {
       const data = new FormData();
       data.append("image", file);
 
-      const auth = JSON.parse(localStorage.getItem("auth"));
       const token = auth?.token;
-
       if (!token) {
-        setErrors((prev) => ({ ...prev, banner: "You are not logged in. Please login first." }));
+        toast.error("Authentication required to upload");
         setUploading(false);
         return;
       }
@@ -291,82 +101,90 @@ const CreateEvent = () => {
       setUploadProgress(100);
       const previewUrl = URL.createObjectURL(file);
       setBannerPreview(previewUrl);
-      setTimeout(() => setUploading(false), 500);
+      toast.success("Banner uploaded successfully!");
     } catch (error) {
       setErrors((prev) => ({
         ...prev,
-        banner: error.response?.data?.message || error.message,
+        banner: error.response?.data?.message || "Failed to upload banner",
       }));
-      setBannerPreview("");
-      setFormData((prev) => ({ ...prev, bannerUrl: "" }));
+      toast.error("Banner upload failed");
+    } finally {
       setUploading(false);
-      setUploadProgress(0);
     }
   };
 
-  // RULES HANDLING
+  // Rules handling
   const handleRuleChange = (index, value) => {
-    const updatedRules = [...formData.rules];
-    updatedRules[index] = value;
-    setFormData((prev) => ({ ...prev, rules: updatedRules }));
+    const updated = [...formData.rules];
+    updated[index] = value;
+    setFormData((prev) => ({ ...prev, rules: updated }));
     if (errors.rules) setErrors((prev) => ({ ...prev, rules: "" }));
   };
+
   const addRule = () => setFormData((prev) => ({ ...prev, rules: [...prev.rules, ""] }));
+
   const removeRule = (index) => {
-    const updatedRules = formData.rules.filter((_, i) => i !== index);
-    setFormData((prev) => ({ ...prev, rules: updatedRules.length > 0 ? updatedRules : [""] }));
+    const updated = formData.rules.filter((_, i) => i !== index);
+    setFormData((prev) => ({ ...prev, rules: updated.length > 0 ? updated : [""] }));
   };
 
-  // PRIZES HANDLING
+  // Prizes handling
   const handlePrizeChange = (index, field, value) => {
-    const updatedPrizes = [...formData.prizes];
-    updatedPrizes[index][field] = value;
-    setFormData((prev) => ({ ...prev, prizes: updatedPrizes }));
+    const updated = [...formData.prizes];
+    updated[index][field] = value;
+    setFormData((prev) => ({ ...prev, prizes: updated }));
     if (errors.prizes) setErrors((prev) => ({ ...prev, prizes: "" }));
   };
+
   const addPrize = () =>
     setFormData((prev) => ({
       ...prev,
       prizes: [...prev.prizes, { position: "", amount: "", perks: "" }],
     }));
+
   const removePrize = (index) => {
-    const updatedPrizes = formData.prizes.filter((_, i) => i !== index);
-    setFormData((prev) => ({ ...prev, prizes: updatedPrizes.length > 0 ? updatedPrizes : prev.prizes }));
+    const updated = formData.prizes.filter((_, i) => i !== index);
+    setFormData((prev) => ({
+      ...prev,
+      prizes: updated.length > 0 ? updated : prev.prizes,
+    }));
   };
 
   const validateForm = () => {
     const newErrors = {};
     if (!formData.eventName.trim()) newErrors.eventName = "Event name is required";
-    if (!formData.description.trim()) newErrors.description = "Description is required";
-    if (!formData.startTime) newErrors.startTime = "Start date & time is required";
-    if (!formData.endTime) newErrors.endTime = "End date & time is required";
+    if (!formData.description.trim()) newErrors.description = "Event description is required";
+    if (!formData.bannerUrl) newErrors.banner = "Cover banner image is required";
+    if (!formData.startTime) newErrors.startTime = "Start time is required";
+    if (!formData.endTime) newErrors.endTime = "End time is required";
     if (formData.startTime && formData.endTime && new Date(formData.endTime) <= new Date(formData.startTime))
       newErrors.endTime = "End time must be after start time";
     if (!formData.registrationStartDate) newErrors.registrationStartDate = "Registration start date is required";
     if (!formData.registrationDeadline) newErrors.registrationDeadline = "Registration deadline is required";
-    if (
-      formData.registrationStartDate &&
-      formData.registrationDeadline &&
-      new Date(formData.registrationDeadline) <= new Date(formData.registrationStartDate)
-    )
-      newErrors.registrationDeadline = "Registration deadline must be after start date";
-    if (!formData.venue) newErrors.venue = "Venue is required";
-    if (!formData.capacity) newErrors.capacity = "Max capacity is required";
-    if (formData.teamSizeMin && formData.teamSizeMax && Number(formData.teamSizeMin) > Number(formData.teamSizeMax))
-      newErrors.teamSizeMax = "Max team size must be greater than Min";
-    if (formData.rules.filter((r) => r.trim() !== "").length === 0)
-      newErrors.rules = "At least one rule is required";
-    if (formData.prizes.filter((p) => p.position.trim() && p.amount.toString().trim() && p.perks.trim()).length === 0)
-      newErrors.prizes = "At least one complete prize is required";
-    if (!formData.bannerUrl) newErrors.banner = "Banner image upload is required";
+    if (!formData.venue.trim()) newErrors.venue = "Venue location is required";
+    if (!formData.capacity) newErrors.capacity = "Maximum participant capacity is required";
+
+    if (formData.rules.filter((r) => r.trim()).length === 0)
+      newErrors.rules = "Provide at least 1 guideline or rule";
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (uploading) { alert("Banner is uploading... Please wait!"); return; }
-    if (validateForm()) {
+    if (uploading) {
+      toast.error("Please wait for the banner to finish uploading");
+      return;
+    }
+
+    if (!validateForm()) {
+      toast.error("Please fill in all required fields highlighted in red");
+      return;
+    }
+
+    try {
+      setSubmitting(true);
       const finalPayload = {
         name: formData.eventName,
         description: formData.description,
@@ -387,867 +205,504 @@ const CreateEvent = () => {
           .filter((p) => p.position.trim() && p.amount.toString().trim() && p.perks.trim())
           .map((p) => ({ position: p.position, amount: Number(p.amount), perks: p.perks })),
       };
-      try {
-        const auth = JSON.parse(localStorage.getItem("auth"));
-        const token = auth?.token;
-        if (!token) { alert("Login required!"); return; }
-        const res = await axios.post(CREATE_EVENT_API_URL, finalPayload, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        console.log("Saved Event:", res.data);
-        alert("Event created successfully!");
-      } catch (error) {
-        alert(error.response?.data?.message || "Event create failed!");
-        console.log(error);
-        return;
-      }
-      setFormData({
-        eventName: "", description: "", startTime: "", endTime: "",
-        registrationStartDate: "", registrationDeadline: "", venue: "",
-        capacity: "", entryFee: "", teamSizeMin: "", teamSizeMax: "",
-        rules: [""], prizes: [{ position: "", amount: "", perks: "" }], bannerUrl: "",
+
+      await axios.post(CREATE_EVENT_API_URL, finalPayload, {
+        headers: { Authorization: `Bearer ${auth.token}` },
       });
-      setErrors({});
-      setBannerPreview("");
-      setUploadProgress(0);
-      if (fileInputRef.current) fileInputRef.current.value = "";
+
+      toast.success("Event published successfully!");
+      navigate("/admin/dashboard");
+    } catch (error) {
+      console.error("Create event error:", error);
+      toast.error(error.response?.data?.message || "Failed to create event");
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const handleCancel = () => {
-    setFormData({
-      eventName: "", description: "", startTime: "", endTime: "",
-      registrationStartDate: "", registrationDeadline: "", venue: "",
-      capacity: "", entryFee: "", teamSizeMin: "", teamSizeMax: "",
-      rules: [""], prizes: [{ position: "", amount: "", perks: "" }], bannerUrl: "",
-    });
-    setErrors({});
-    setBannerPreview("");
-    setUploadProgress(0);
-    setUploading(false);
-    setOpenPreview(false);
-    if (fileInputRef.current) fileInputRef.current.value = "";
-  };
-
-  // ─── Render ───────────────────────────────────────────────────────────────
-
   return (
-    <>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Syne:wght@700;800&display=swap');
-        .ce-root * { box-sizing: border-box; font-family: 'DM Sans', sans-serif; }
-        .ce-input:focus { border-color: ${BRAND.purple} !important; background: #FAFAFE !important; box-shadow: 0 0 0 3.5px rgba(107,94,199,0.13) !important; outline: none !important; }
-        .ce-input-error:focus { border-color: ${BRAND.coral} !important; box-shadow: 0 0 0 3.5px rgba(212,96,122,0.13) !important; }
-        .ce-select:focus { border-color: ${BRAND.purple} !important; box-shadow: 0 0 0 3.5px rgba(107,94,199,0.13) !important; outline: none !important; }
-        .ce-textarea:focus { border-color: ${BRAND.purple} !important; box-shadow: 0 0 0 3.5px rgba(107,94,199,0.13) !important; outline: none !important; }
-        .prize-card { transition: border-color 0.2s, box-shadow 0.2s; }
-        .prize-card:hover { border-color: ${BRAND.purple}55 !important; box-shadow: 0 4px 16px rgba(107,94,199,0.08); }
-        .rule-row:hover .rule-number { background: ${BRAND.gradientBg}; color: white; }
-        @media (max-width: 640px) { .ce-grid-2 { grid-template-columns: 1fr !important; } .ce-form-actions { flex-direction: column-reverse !important; } }
-      `}</style>
-
-      <div
-        className="ce-root"
-        style={{
-          minHeight: "100vh",
-          background: "linear-gradient(135deg, #F8F5FF 0%, #FDF0F3 40%, #F5F0FF 100%)",
-          padding: "40px 16px 60px",
-        }}
-      >
-        {/* ── Page Header ── */}
-        <div style={{ maxWidth: 860, margin: "0 auto 32px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-            <div
-              style={{
-                width: 36,
-                height: 36,
-                borderRadius: 10,
-                background: BRAND.gradientBg,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Sparkles size={18} color="#fff" />
-            </div>
-            <span
-              style={{
-                fontSize: "0.72rem",
-                fontWeight: 700,
-                letterSpacing: "0.12em",
-                textTransform: "uppercase",
-                color: BRAND.purple,
-              }}
-            >
-              Event Management
-            </span>
-          </div>
-          <h1
-            style={{
-              fontSize: "clamp(1.8rem, 4vw, 2.6rem)",
-              fontFamily: "'Syne', sans-serif",
-              fontWeight: 800,
-              letterSpacing: "-0.03em",
-              margin: "0 0 10px",
-              background: BRAND.gradientText,
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-              backgroundClip: "text",
-            }}
+    <DashboardLayout>
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <Link
+            to="/admin/dashboard"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 mb-2 transition-colors"
           >
-            Create New Event
+            <ArrowLeft size={14} /> Back to Dashboard
+          </Link>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+            Create New Campus Event
           </h1>
-          <p style={{ color: "#7B6E9A", fontSize: "0.92rem", margin: 0 }}>
-            Fill in the details below to add a new event to the tech fest schedule.
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+            Configure registrations, ticket capacity, event schedules, rules, and rewards.
           </p>
         </div>
 
-        {/* ── Form ── */}
-        <form onSubmit={handleSubmit} style={{ maxWidth: 860, margin: "0 auto" }}>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => navigate("/admin/dashboard")}
+            className="px-4 py-2.5 rounded-xl font-semibold text-xs text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/60 shadow-xs transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={submitting || uploading}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs text-white bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-600/20 disabled:opacity-60 transition-all"
+          >
+            <Save size={15} />
+            {submitting ? "Publishing Event..." : "Publish Event"}
+          </button>
+        </div>
+      </div>
 
-          {/* ─ Event Information ─ */}
-          <SectionCard>
-            <SectionHeader icon={Info} title="Event Information" />
-
-            {/* Event Name */}
-            <div style={{ marginBottom: 22 }}>
-              <FieldLabel required>Event Name</FieldLabel>
-              <input
-                className={`ce-input ${errors.eventName ? "ce-input-error" : ""}`}
-                style={errors.eventName ? errorInputStyle : baseInputStyle}
-                placeholder="e.g., Inter College Hackathon"
-                type="text"
-                name="eventName"
-                value={formData.eventName}
-                onChange={handleChange}
-              />
-              <FieldError msg={errors.eventName} />
+      <form onSubmit={handleSubmit} className="space-y-6 max-w-5xl">
+        {/* Section 1: General Info */}
+        <div className="p-6 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-4">
+          <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100 dark:border-slate-800">
+            <div className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400">
+              <Info size={18} />
             </div>
+            <h2 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+              1. General Information
+            </h2>
+          </div>
 
-            {/* Banner Upload */}
-            <div style={{ marginBottom: 22 }}>
-              <FieldLabel required>Event Banner</FieldLabel>
+          <div>
+            <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-1.5">
+              Event Title <span className="text-rose-500">*</span>
+            </label>
+            <input
+              type="text"
+              name="eventName"
+              value={formData.eventName}
+              onChange={handleChange}
+              placeholder="e.g. National Hackathon 2026: Code for Innovation"
+              className={`w-full px-3.5 py-2.5 text-sm rounded-xl bg-slate-50 dark:bg-slate-900 border text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 ${
+                errors.eventName
+                  ? "border-rose-300 dark:border-rose-700 focus:border-rose-500"
+                  : "border-slate-200 dark:border-slate-700 focus:border-indigo-500"
+              }`}
+            />
+            {errors.eventName && (
+              <p className="text-xs text-rose-500 mt-1 flex items-center gap-1 font-medium">
+                <AlertCircle size={12} /> {errors.eventName}
+              </p>
+            )}
+          </div>
 
-              <div
-                onClick={() => { if (!uploading) fileInputRef.current.click(); }}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  if (uploading) return;
-                  const file = e.dataTransfer.files[0];
-                  if (file) handleFileChange({ target: { files: [file] } });
-                }}
-                style={{
-                  border: `2px dashed ${errors.banner ? BRAND.coral : uploading ? "#C4BBF0" : "#C4BBF0"}`,
-                  borderRadius: 16,
-                  padding: "36px 24px",
-                  background: uploading
-                    ? BRAND.purpleSurface.bg
-                    : errors.banner
-                    ? BRAND.coralSurface.bg
-                    : "#FAFAFE",
-                  cursor: uploading ? "not-allowed" : "pointer",
-                  textAlign: "center",
-                  transition: "all 0.2s",
-                }}
-                onMouseEnter={(e) => {
-                  if (!uploading) e.currentTarget.style.borderColor = BRAND.purple;
-                }}
-                onMouseLeave={(e) => {
-                  if (!uploading) e.currentTarget.style.borderColor = errors.banner ? BRAND.coral : "#C4BBF0";
-                }}
-              >
-                <div
-                  style={{
-                    width: 56,
-                    height: 56,
-                    borderRadius: "50%",
-                    background: BRAND.gradientBg,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    margin: "0 auto 14px",
-                    boxShadow: "0 6px 20px rgba(212,96,122,0.25)",
-                  }}
-                >
-                  <UploadCloud size={26} color="#fff" />
+          <div>
+            <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-1.5">
+              Description & Highlights <span className="text-rose-500">*</span>
+            </label>
+            <textarea
+              name="description"
+              rows={4}
+              value={formData.description}
+              onChange={handleChange}
+              placeholder="Describe event objectives, eligibility criteria, schedule breakdown, and key takeaways..."
+              className={`w-full px-3.5 py-2.5 text-sm rounded-xl bg-slate-50 dark:bg-slate-900 border text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 ${
+                errors.description
+                  ? "border-rose-300 dark:border-rose-700 focus:border-rose-500"
+                  : "border-slate-200 dark:border-slate-700 focus:border-indigo-500"
+              }`}
+            />
+            {errors.description && (
+              <p className="text-xs text-rose-500 mt-1 flex items-center gap-1 font-medium">
+                <AlertCircle size={12} /> {errors.description}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Section 2: Banner Media */}
+        <div className="p-6 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-4">
+          <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100 dark:border-slate-800">
+            <div className="p-2 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400">
+              <UploadCloud size={18} />
+            </div>
+            <h2 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+              2. Cover Banner
+            </h2>
+          </div>
+
+          <div
+            onClick={() => fileInputRef.current?.click()}
+            className={`relative p-8 rounded-2xl border-2 border-dashed text-center cursor-pointer transition-colors ${
+              errors.banner
+                ? "border-rose-300 dark:border-rose-700 bg-rose-50/40 dark:bg-rose-950/20"
+                : formData.bannerUrl
+                ? "border-emerald-300 dark:border-emerald-700 bg-emerald-50/40 dark:bg-emerald-950/20"
+                : "border-slate-200 dark:border-slate-700 hover:border-indigo-400 dark:hover:border-indigo-500 bg-slate-50 dark:bg-slate-900/50"
+            }`}
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleFileChange}
+            />
+
+            {bannerPreview || formData.bannerUrl ? (
+              <div className="space-y-3">
+                <img
+                  src={bannerPreview || formData.bannerUrl}
+                  alt="Banner preview"
+                  className="max-h-56 mx-auto rounded-xl object-cover shadow-md"
+                />
+                <div className="flex items-center justify-center gap-2 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                  <CheckCircle2 size={16} /> Banner uploaded successfully! (Click to replace)
                 </div>
-
-                <p style={{ fontWeight: 700, color: "#1a1033", marginBottom: 4, fontSize: "0.95rem" }}>
-                  {uploading ? "Uploading banner…" : "Click to upload or drag & drop"}
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="size-12 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mx-auto">
+                  <UploadCloud size={24} />
+                </div>
+                <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                  {uploading ? "Uploading banner image..." : "Upload Cover Banner"}
                 </p>
-                <p style={{ color: "#9B8FC4", fontSize: "0.8rem", marginBottom: 0 }}>
-                  PNG, JPG, GIF · max 3 MB
+                <p className="text-xs text-slate-400">
+                  PNG, JPG, or WEBP up to 5MB · Recommended 16:9 ratio (1200x675)
                 </p>
-
-                {/* Progress bar */}
                 {uploading && (
-                  <div style={{ marginTop: 20, maxWidth: 340, margin: "20px auto 0" }}>
-                    <div
-                      style={{
-                        height: 6,
-                        borderRadius: 99,
-                        background: "#E8E3F5",
-                        overflow: "hidden",
-                      }}
-                    >
+                  <div className="max-w-xs mx-auto mt-3">
+                    <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
                       <div
-                        style={{
-                          height: "100%",
-                          width: `${uploadProgress}%`,
-                          background: BRAND.gradientBg,
-                          borderRadius: 99,
-                          transition: "width 0.3s",
-                        }}
+                        className="h-full bg-indigo-600 transition-all duration-200"
+                        style={{ width: `${uploadProgress}%` }}
                       />
                     </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        marginTop: 6,
-                        fontSize: "0.75rem",
-                        color: BRAND.purple,
-                        fontWeight: 600,
-                      }}
-                    >
-                      <span>Uploading…</span>
-                      <span>{uploadProgress}%</span>
-                    </div>
+                    <span className="text-[11px] text-slate-400 mt-1 block">
+                      {uploadProgress}%
+                    </span>
                   </div>
                 )}
-
-                {formData.bannerUrl && !uploading && (
-                  <div
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 6,
-                      marginTop: 14,
-                      background: "#EDFBF3",
-                      border: "1px solid #A3E6C0",
-                      borderRadius: 99,
-                      padding: "6px 14px",
-                      color: "#1A7A4A",
-                      fontSize: "0.8rem",
-                      fontWeight: 700,
-                    }}
-                  >
-                    <CheckCircle2 size={15} />
-                    Uploaded Successfully
-                  </div>
-                )}
-
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  style={{ display: "none" }}
-                  onChange={handleFileChange}
-                  accept="image/*"
-                  disabled={uploading}
-                />
               </div>
+            )}
+          </div>
+          {errors.banner && (
+            <p className="text-xs text-rose-500 flex items-center gap-1 font-medium">
+              <AlertCircle size={12} /> {errors.banner}
+            </p>
+          )}
+        </div>
 
-              {/* Preview thumbnail */}
-              {formData.bannerUrl && bannerPreview && !uploading && (
-                <div style={{ marginTop: 16 }}>
-                  <p
-                    style={{
-                      fontSize: "0.75rem",
-                      fontWeight: 700,
-                      color: "#7B6E9A",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.06em",
-                      marginBottom: 8,
-                    }}
-                  >
-                    Preview
-                  </p>
-                  <div
-                    onClick={() => setOpenPreview(true)}
-                    style={{
-                      position: "relative",
-                      width: 280,
-                      borderRadius: 14,
-                      overflow: "hidden",
-                      border: "1px solid #E8E3F5",
-                      boxShadow: "0 4px 14px rgba(107,94,199,0.12)",
-                      cursor: "pointer",
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.querySelector(".preview-overlay").style.opacity = "1";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.querySelector(".preview-overlay").style.opacity = "0";
-                    }}
-                  >
-                    <img
-                      src={bannerPreview}
-                      alt="Banner Preview"
-                      style={{ width: "100%", height: 160, objectFit: "cover", display: "block" }}
-                    />
-                    <div
-                      className="preview-overlay"
-                      style={{
-                        position: "absolute",
-                        inset: 0,
-                        background: "rgba(83,74,183,0.55)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        opacity: 0,
-                        transition: "opacity 0.2s",
-                      }}
-                    >
-                      <span
-                        style={{
-                          color: "#fff",
-                          fontSize: "0.8rem",
-                          fontWeight: 700,
-                          background: "rgba(0,0,0,0.4)",
-                          padding: "6px 16px",
-                          borderRadius: 99,
-                        }}
-                      >
-                        View Full Image
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )}
-              <FieldError msg={errors.banner} />
+        {/* Section 3: Schedule & Logistics */}
+        <div className="p-6 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-4">
+          <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100 dark:border-slate-800">
+            <div className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400">
+              <Calendar size={18} />
             </div>
+            <h2 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+              3. Schedule & Logistics
+            </h2>
+          </div>
 
-            {/* Description */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <FieldLabel required>Description</FieldLabel>
-              <textarea
-                className="ce-textarea"
-                style={{
-                  ...baseInputStyle,
-                  height: "auto",
-                  padding: "14px 16px",
-                  resize: "none",
-                  lineHeight: 1.6,
-                }}
-                rows={5}
-                placeholder="Describe the event agenda, prerequisites, and what participants can expect…"
-                name="description"
-                value={formData.description}
+              <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-1.5">
+                Event Start Date & Time <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="datetime-local"
+                name="startTime"
+                value={formData.startTime}
                 onChange={handleChange}
+                className="w-full px-3.5 py-2.5 text-sm rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
               />
-              <FieldError msg={errors.description} />
+              {errors.startTime && (
+                <p className="text-xs text-rose-500 mt-1">{errors.startTime}</p>
+              )}
             </div>
-          </SectionCard>
 
-          {/* ─ Logistics ─ */}
-          <SectionCard>
-            <SectionHeader icon={Calendar} title="Logistics" />
+            <div>
+              <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-1.5">
+                Event End Date & Time <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="datetime-local"
+                name="endTime"
+                value={formData.endTime}
+                onChange={handleChange}
+                className="w-full px-3.5 py-2.5 text-sm rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+              />
+              {errors.endTime && (
+                <p className="text-xs text-rose-500 mt-1">{errors.endTime}</p>
+              )}
+            </div>
 
-            <div
-              className="ce-grid-2"
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: "20px 24px",
-              }}
-            >
-              {/* Start */}
-              <div>
-                <FieldLabel required>Start Date & Time</FieldLabel>
-                <InputWithIcon
-                  icon={Calendar}
-                  error={errors.startTime}
-                  className={`ce-input ${errors.startTime ? "ce-input-error" : ""}`}
-                  type="datetime-local"
-                  name="startTime"
-                  value={formData.startTime}
-                  onChange={handleChange}
-                  style={{ paddingLeft: 42 }}
-                />
-                <FieldError msg={errors.startTime} />
-              </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-1.5">
+                Registration Opens <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="datetime-local"
+                name="registrationStartDate"
+                value={formData.registrationStartDate}
+                onChange={handleChange}
+                className="w-full px-3.5 py-2.5 text-sm rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+              />
+            </div>
 
-              {/* End */}
-              <div>
-                <FieldLabel required>End Date & Time</FieldLabel>
-                <InputWithIcon
-                  icon={CalendarX}
-                  error={errors.endTime}
-                  className={`ce-input ${errors.endTime ? "ce-input-error" : ""}`}
-                  type="datetime-local"
-                  name="endTime"
-                  value={formData.endTime}
-                  onChange={handleChange}
-                  style={{ paddingLeft: 42 }}
-                />
-                <FieldError msg={errors.endTime} />
-              </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-1.5">
+                Registration Closes <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="datetime-local"
+                name="registrationDeadline"
+                value={formData.registrationDeadline}
+                onChange={handleChange}
+                className="w-full px-3.5 py-2.5 text-sm rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+              />
+            </div>
+          </div>
 
-              {/* Reg Start */}
-              <div>
-                <FieldLabel required>Registration Start</FieldLabel>
+          <div>
+            <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-1.5">
+              Campus Venue / Hall <span className="text-rose-500">*</span>
+            </label>
+            <div className="relative">
+              <MapPin size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                name="venue"
+                value={formData.venue}
+                onChange={handleChange}
+                placeholder="e.g. Main Auditorium, Block C or CS Lab 3"
+                className="w-full pl-9 pr-3.5 py-2.5 text-sm rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+              />
+            </div>
+            {errors.venue && (
+              <p className="text-xs text-rose-500 mt-1">{errors.venue}</p>
+            )}
+          </div>
+        </div>
+
+        {/* Section 4: Participation & Fees */}
+        <div className="p-6 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-4">
+          <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100 dark:border-slate-800">
+            <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
+              <Users size={18} />
+            </div>
+            <h2 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+              4. Capacity & Pricing
+            </h2>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-1.5">
+                Max Capacity <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="number"
+                min="1"
+                name="capacity"
+                value={formData.capacity}
+                onChange={handleChange}
+                placeholder="e.g. 250"
+                className="w-full px-3.5 py-2.5 text-sm rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+              />
+              {errors.capacity && (
+                <p className="text-xs text-rose-500 mt-1">{errors.capacity}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-1.5">
+                Entry Fee (INR)
+              </label>
+              <div className="relative">
+                <IndianRupee size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
-                  className={`ce-input ${errors.registrationStartDate ? "ce-input-error" : ""}`}
-                  style={errors.registrationStartDate ? errorInputStyle : baseInputStyle}
-                  type="datetime-local"
-                  name="registrationStartDate"
-                  value={formData.registrationStartDate}
-                  onChange={handleChange}
-                />
-                <FieldError msg={errors.registrationStartDate} />
-              </div>
-
-              {/* Reg Deadline */}
-              <div>
-                <FieldLabel required>Registration Deadline</FieldLabel>
-                <input
-                  className={`ce-input ${errors.registrationDeadline ? "ce-input-error" : ""}`}
-                  style={errors.registrationDeadline ? errorInputStyle : baseInputStyle}
-                  type="datetime-local"
-                  name="registrationDeadline"
-                  value={formData.registrationDeadline}
-                  onChange={handleChange}
-                />
-                <FieldError msg={errors.registrationDeadline} />
-              </div>
-
-              {/* Venue */}
-              <div>
-                <FieldLabel required>Venue</FieldLabel>
-                <div style={{ position: "relative" }}>
-                  <div
-                    style={{
-                      position: "absolute",
-                      inset: "0 auto 0 0",
-                      paddingLeft: 14,
-                      display: "flex",
-                      alignItems: "center",
-                      pointerEvents: "none",
-                    }}
-                  >
-                    <MapPin size={16} color={errors.venue ? BRAND.coral : "#9B8FC4"} />
-                  </div>
-                  <div
-                    style={{
-                      position: "absolute",
-                      inset: "0 0 0 auto",
-                      paddingRight: 14,
-                      display: "flex",
-                      alignItems: "center",
-                      pointerEvents: "none",
-                    }}
-                  >
-                    <ChevronDown size={16} color="#9B8FC4" />
-                  </div>
-                  <select
-                    className="ce-select"
-                    style={{
-                      ...(errors.venue ? errorInputStyle : baseInputStyle),
-                      paddingLeft: 42,
-                      paddingRight: 40,
-                      appearance: "none",
-                      cursor: "pointer",
-                    }}
-                    name="venue"
-                    value={formData.venue}
-                    onChange={handleChange}
-                  >
-                    <option value="" disabled>Select a location</option>
-                    <option value="main-auditorium">Main Auditorium</option>
-                    <option value="CSE Lab">CSE Lab (Block A)</option>
-                    <option value="AIML Lab">AIML Lab</option>
-                    <option value="AIDS">AIDS Lab</option>
-                    <option value="ENTC">ENTC Lab</option>
-                  </select>
-                </div>
-                <FieldError msg={errors.venue} />
-              </div>
-
-              {/* Capacity */}
-              <div>
-                <FieldLabel required>Max Capacity</FieldLabel>
-                <InputWithIcon
-                  icon={Users}
-                  error={errors.capacity}
-                  className={`ce-input ${errors.capacity ? "ce-input-error" : ""}`}
-                  type="number"
-                  min="1"
-                  placeholder="e.g. 200"
-                  name="capacity"
-                  value={formData.capacity}
-                  onChange={handleChange}
-                  style={{ paddingLeft: 42 }}
-                />
-                <FieldError msg={errors.capacity} />
-              </div>
-
-              {/* Entry Fee */}
-              <div>
-                <FieldLabel>Entry Fee (₹)</FieldLabel>
-                <InputWithIcon
-                  icon={Wallet}
-                  className="ce-input"
                   type="number"
                   min="0"
-                  placeholder="e.g. 199 (leave blank for free)"
                   name="entryFee"
                   value={formData.entryFee}
                   onChange={handleChange}
-                  style={{ paddingLeft: 42 }}
+                  placeholder="0 for Free"
+                  className="w-full pl-8 pr-3.5 py-2.5 text-sm rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                 />
               </div>
+            </div>
 
-              {/* Team Size */}
-              <div>
-                <FieldLabel>Team Size (Min / Max)</FieldLabel>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                  <input
-                    className="ce-input"
-                    style={baseInputStyle}
-                    type="number"
-                    min="1"
-                    placeholder="Min"
-                    name="teamSizeMin"
-                    value={formData.teamSizeMin}
-                    onChange={handleChange}
-                  />
-                  <input
-                    className={`ce-input ${errors.teamSizeMax ? "ce-input-error" : ""}`}
-                    style={errors.teamSizeMax ? errorInputStyle : baseInputStyle}
-                    type="number"
-                    min="1"
-                    placeholder="Max"
-                    name="teamSizeMax"
-                    value={formData.teamSizeMax}
-                    onChange={handleChange}
-                  />
-                </div>
-                <FieldError msg={errors.teamSizeMax} />
+            <div>
+              <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-1.5">
+                Team Size (Min - Max)
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  type="number"
+                  min="1"
+                  name="teamSizeMin"
+                  value={formData.teamSizeMin}
+                  onChange={handleChange}
+                  placeholder="Min"
+                  className="w-full px-3 py-2.5 text-sm rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-center focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                />
+                <input
+                  type="number"
+                  min="1"
+                  name="teamSizeMax"
+                  value={formData.teamSizeMax}
+                  onChange={handleChange}
+                  placeholder="Max"
+                  className="w-full px-3 py-2.5 text-sm rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-center focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                />
               </div>
             </div>
-          </SectionCard>
-
-          {/* ─ Rules ─ */}
-          <SectionCard>
-            <SectionHeader icon={ClipboardList} title="Rules & Guidelines" required />
-
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {formData.rules.map((rule, index) => (
-                <div
-                  key={index}
-                  className="rule-row"
-                  style={{ display: "flex", alignItems: "center", gap: 12 }}
-                >
-                  <div
-                    className="rule-number"
-                    style={{
-                      width: 30,
-                      height: 30,
-                      borderRadius: 8,
-                      background: BRAND.purpleSurface.bg,
-                      border: `1px solid ${BRAND.purpleSurface.border}`,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: "0.75rem",
-                      fontWeight: 800,
-                      color: BRAND.purple,
-                      flexShrink: 0,
-                      transition: "all 0.2s",
-                    }}
-                  >
-                    {index + 1}
-                  </div>
-                  <input
-                    className="ce-input"
-                    style={{ ...baseInputStyle, flex: 1 }}
-                    placeholder={`Rule ${index + 1} — e.g., Teams must have a college ID`}
-                    value={rule}
-                    onChange={(e) => handleRuleChange(index, e.target.value)}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeRule(index)}
-                    style={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: 9,
-                      border: `1.5px solid ${BRAND.coralSurface.border}`,
-                      background: BRAND.coralSurface.bg,
-                      color: BRAND.coral,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      cursor: "pointer",
-                      transition: "all 0.15s",
-                      flexShrink: 0,
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = "#F7D6DF")}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = BRAND.coralSurface.bg)}
-                  >
-                    <Trash2 size={15} />
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            <FieldError msg={errors.rules} />
-
-            <div style={{ marginTop: 16 }}>
-              <GhostButton onClick={addRule}>
-                <Plus size={15} />
-                Add Rule
-              </GhostButton>
-            </div>
-          </SectionCard>
-
-          {/* ─ Prizes ─ */}
-          <SectionCard>
-            <SectionHeader icon={Trophy} title="Prize Details" required />
-
-            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              {formData.prizes.map((prize, index) => {
-                const medalColors = ["#F5A623", "#9B8FC4", "#C47A1A"];
-                const medalLabels = ["🥇 1st", "🥈 2nd", "🥉 3rd"];
-                return (
-                  <div
-                    key={index}
-                    className="prize-card"
-                    style={{
-                      border: "1.5px solid #E8E3F5",
-                      borderRadius: 16,
-                      padding: 20,
-                      background: "#FAFAFE",
-                      position: "relative",
-                    }}
-                  >
-                    {/* Prize badge */}
-                    {index < 3 && (
-                      <div
-                        style={{
-                          position: "absolute",
-                          top: -10,
-                          left: 20,
-                          background: BRAND.gradientBg,
-                          color: "#fff",
-                          fontSize: "0.7rem",
-                          fontWeight: 800,
-                          padding: "3px 12px",
-                          borderRadius: 99,
-                          letterSpacing: "0.04em",
-                        }}
-                      >
-                        Prize #{index + 1}
-                      </div>
-                    )}
-
-                    <div
-                      className="ce-grid-2"
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns: "1fr 1fr 1fr",
-                        gap: "14px 16px",
-                        marginTop: 8,
-                      }}
-                    >
-                      <div>
-                        <FieldLabel>Position</FieldLabel>
-                        <input
-                          className="ce-input"
-                          style={baseInputStyle}
-                          placeholder={index < 3 ? medalLabels[index] : "e.g. Winner"}
-                          value={prize.position}
-                          onChange={(e) => handlePrizeChange(index, "position", e.target.value)}
-                        />
-                      </div>
-                      <div>
-                        <FieldLabel>Amount (₹)</FieldLabel>
-                        <input
-                          className="ce-input"
-                          style={baseInputStyle}
-                          type="number"
-                          min="0"
-                          placeholder="e.g. 25000"
-                          value={prize.amount}
-                          onChange={(e) => handlePrizeChange(index, "amount", e.target.value)}
-                        />
-                      </div>
-                      <div>
-                        <FieldLabel>Perks</FieldLabel>
-                        <input
-                          className="ce-input"
-                          style={baseInputStyle}
-                          placeholder="e.g. Trophy + Certificate"
-                          value={prize.perks}
-                          onChange={(e) => handlePrizeChange(index, "perks", e.target.value)}
-                        />
-                      </div>
-                    </div>
-
-                    <div style={{ marginTop: 14, display: "flex", justifyContent: "flex-end" }}>
-                      <GhostButton danger onClick={() => removePrize(index)}>
-                        <Trash2 size={14} />
-                        Remove
-                      </GhostButton>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            <FieldError msg={errors.prizes} />
-
-            <div style={{ marginTop: 16 }}>
-              <GhostButton onClick={addPrize}>
-                <Plus size={15} />
-                Add Prize
-              </GhostButton>
-            </div>
-          </SectionCard>
-
-          {/* ─ Action Bar ─ */}
-          <div
-            style={{
-              background: "#fff",
-              borderRadius: 20,
-              border: "1px solid #F0EBF8",
-              boxShadow: "0 2px 12px 0 rgba(107,94,199,0.06)",
-              padding: "22px 28px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              flexWrap: "wrap",
-              gap: 12,
-            }}
-          >
-            <p style={{ color: "#9B8FC4", fontSize: "0.8rem", margin: 0 }}>
-              Fields marked <span style={{ color: BRAND.coral, fontWeight: 700 }}>*</span> are required.
-            </p>
-
-            <div
-              className="ce-form-actions"
-              style={{ display: "flex", alignItems: "center", gap: 12 }}
-            >
-              <button
-                type="button"
-                onClick={handleCancel}
-                style={{
-                  padding: "11px 28px",
-                  borderRadius: 12,
-                  border: "1.5px solid #E8E3F5",
-                  background: "#fff",
-                  color: "#4B4568",
-                  fontSize: "0.88rem",
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  transition: "all 0.15s",
-                  fontFamily: "inherit",
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = "#F8F5FF")}
-                onMouseLeave={(e) => (e.currentTarget.style.background = "#fff")}
-              >
-                Cancel
-              </button>
-
-              <button
-                type="submit"
-                disabled={uploading}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 8,
-                  padding: "11px 28px",
-                  borderRadius: 12,
-                  border: "none",
-                  background: uploading ? "#C4BBF0" : BRAND.gradientBg,
-                  color: "#fff",
-                  fontSize: "0.88rem",
-                  fontWeight: 700,
-                  cursor: uploading ? "not-allowed" : "pointer",
-                  boxShadow: uploading ? "none" : "0 4px 18px rgba(212,96,122,0.35)",
-                  transition: "all 0.2s",
-                  fontFamily: "inherit",
-                  letterSpacing: "0.01em",
-                }}
-                onMouseEnter={(e) => {
-                  if (!uploading) {
-                    e.currentTarget.style.transform = "translateY(-2px)";
-                    e.currentTarget.style.boxShadow = "0 8px 24px rgba(212,96,122,0.4)";
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = "translateY(0)";
-                  e.currentTarget.style.boxShadow = uploading ? "none" : "0 4px 18px rgba(212,96,122,0.35)";
-                }}
-              >
-                <Save size={16} />
-                {uploading ? "Uploading…" : "Save Event"}
-              </button>
-            </div>
-          </div>
-        </form>
-      </div>
-
-      {/* ─ Full Image Modal ─ */}
-      {openPreview && (
-        <div
-          onClick={() => setOpenPreview(false)}
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(26,16,51,0.75)",
-            backdropFilter: "blur(6px)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 9999,
-            padding: 20,
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              position: "relative",
-              background: "#fff",
-              borderRadius: 20,
-              boxShadow: "0 32px 80px rgba(0,0,0,0.4)",
-              maxWidth: 800,
-              width: "100%",
-              overflow: "hidden",
-            }}
-          >
-            <img
-              src={bannerPreview}
-              alt="Full Banner"
-              style={{ width: "100%", maxHeight: "80vh", objectFit: "contain", background: "#0a0a0a", display: "block" }}
-            />
-            <button
-              onClick={() => setOpenPreview(false)}
-              style={{
-                position: "absolute",
-                top: 14,
-                right: 14,
-                width: 36,
-                height: 36,
-                borderRadius: "50%",
-                background: "rgba(255,255,255,0.95)",
-                border: "none",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                cursor: "pointer",
-                boxShadow: "0 2px 10px rgba(0,0,0,0.2)",
-                color: "#1a1033",
-              }}
-            >
-              <X size={16} />
-            </button>
           </div>
         </div>
-      )}
-    </>
-  );
-};
 
-export default CreateEvent;
+        {/* Section 5: Rules & Guidelines */}
+        <div className="p-6 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400">
+                <ClipboardList size={18} />
+              </div>
+              <h2 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+                5. Guidelines & Code of Conduct
+              </h2>
+            </div>
+            <button
+              type="button"
+              onClick={addRule}
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
+            >
+              <Plus size={14} /> Add Rule
+            </button>
+          </div>
+
+          <div className="space-y-2.5">
+            {formData.rules.map((rule, idx) => (
+              <div key={idx} className="flex items-center gap-2">
+                <span className="size-7 rounded-lg bg-slate-100 dark:bg-slate-700/60 text-slate-500 font-bold text-xs flex items-center justify-center shrink-0">
+                  {idx + 1}
+                </span>
+                <input
+                  type="text"
+                  value={rule}
+                  onChange={(e) => handleRuleChange(idx, e.target.value)}
+                  placeholder={`Rule ${idx + 1} — e.g. Valid college ID mandatory for entry`}
+                  className="flex-1 px-3.5 py-2 text-sm rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                />
+                {formData.rules.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => removeRule(idx)}
+                    className="p-2 text-slate-400 hover:text-rose-500 transition-colors"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+          {errors.rules && <p className="text-xs text-rose-500 mt-1">{errors.rules}</p>}
+        </div>
+
+        {/* Section 6: Prizes */}
+        <div className="p-6 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400">
+                <Trophy size={18} />
+              </div>
+              <h2 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+                6. Prize Pool & Accolades
+              </h2>
+            </div>
+            <button
+              type="button"
+              onClick={addPrize}
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-600 dark:text-amber-400 hover:underline"
+            >
+              <Plus size={14} /> Add Prize Tier
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+            {formData.prizes.map((prize, idx) => (
+              <div
+                key={idx}
+                className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/40 relative space-y-2.5"
+              >
+                {formData.prizes.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => removePrize(idx)}
+                    className="absolute top-3 right-3 text-slate-400 hover:text-rose-500"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                )}
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                    Position
+                  </label>
+                  <input
+                    type="text"
+                    value={prize.position}
+                    onChange={(e) => handlePrizeChange(idx, "position", e.target.value)}
+                    placeholder="e.g. 1st Place / Winner"
+                    className="w-full px-3 py-1.5 text-xs rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                    Cash Prize (INR)
+                  </label>
+                  <input
+                    type="number"
+                    value={prize.amount}
+                    onChange={(e) => handlePrizeChange(idx, "amount", e.target.value)}
+                    placeholder="e.g. 25000"
+                    className="w-full px-3 py-1.5 text-xs rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                    Perks & Goodies
+                  </label>
+                  <input
+                    type="text"
+                    value={prize.perks}
+                    onChange={(e) => handlePrizeChange(idx, "perks", e.target.value)}
+                    placeholder="e.g. Trophy + Swag Kits + Certificate"
+                    className="w-full px-3 py-1.5 text-xs rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Bottom Actions */}
+        <div className="flex items-center justify-end gap-3 pt-4">
+          <button
+            type="button"
+            onClick={() => navigate("/admin/dashboard")}
+            className="px-5 py-2.5 rounded-xl font-semibold text-xs text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/60 shadow-xs transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={submitting || uploading}
+            className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold text-xs text-white bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-600/20 disabled:opacity-60 transition-all"
+          >
+            <Save size={15} />
+            {submitting ? "Publishing Event..." : "Publish Event"}
+          </button>
+        </div>
+      </form>
+    </DashboardLayout>
+  );
+}

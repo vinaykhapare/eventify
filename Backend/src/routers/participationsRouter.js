@@ -17,6 +17,10 @@ router
 router.route("/me").get(requireRole("STUDENT"), getAllTickets);
 
 router
+  .route("/:participationId/checkin")
+  .post(requireRole("VOLUNTEER"), checkInParticipant);
+
+router
   .route("/:participationId/checkIn")
   .post(requireRole("VOLUNTEER"), checkInParticipant);
 

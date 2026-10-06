@@ -4,6 +4,8 @@ const eventSchema = new mongoose.Schema(
   {
     name: { type: String, required: true },
 
+    tagline: { type: String, default: "" },
+
     description: { type: String, required: true },
 
     bannerImageUrl: { type: String },
@@ -46,6 +48,9 @@ const eventSchema = new mongoose.Schema(
   },
   { timestamps: true },
 );
+
+eventSchema.index({ createdBy: 1, createdAt: -1 });
+eventSchema.index({ endTime: 1, startTime: 1 });
 
 const Event = mongoose.model("Event", eventSchema);
 

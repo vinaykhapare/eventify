@@ -1,5 +1,6 @@
 import { Navigate } from "react-router-dom";
 import { useAuthContext } from "../../../hooks/useAuthContext";
+import Landing from "../../screens/Landing";
 
 function getDefaultRoute(role) {
   switch (role) {
@@ -17,11 +18,10 @@ function getDefaultRoute(role) {
 export default function RootRedirect() {
   const { isAuthenticated, auth } = useAuthContext();
 
-  console.log(auth);
-
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
+  if (!isAuthenticated || !auth?.user?.role) {
+    return <Landing />;
   }
 
   return <Navigate to={getDefaultRoute(auth.user.role)} replace />;
 }
+

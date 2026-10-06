@@ -1,23 +1,31 @@
-import { createContext, useEffect, useState } from "react";
-
-export const AuthContext = createContext();
+import { useEffect, useState } from "react";
+import { AuthContext } from "./AuthContextInstance";
 
 export const AuthProvider = ({ children }) => {
   const [auth, setAuth] = useState(() => {
-    const data = localStorage.getItem("auth") || null;
-    if (!data) return data;
-    return JSON.parse(data);
+    try {
+      const data = localStorage.getItem("auth");
+      if (!data) return null;
+      return JSON.parse(data);
+    } catch {
+      localStorage.removeItem("auth");
+      return null;
+    }
   });
 
-  const isAuthenticated = !!auth;
+  const isAuthenticated = Boolean(auth?.token);
 
   useEffect(() => {
-  if (auth) {
-    localStorage.setItem("auth", JSON.stringify(auth));
-  } else {
-    localStorage.removeItem("auth");
-  }
-}, [auth]);
+    try {
+      if (auth) {
+        localStorage.setItem("auth", JSON.stringify(auth));
+      } else {
+        localStorage.removeItem("auth");
+      }
+    } catch (err) {
+      console.error("Failed to sync auth to localStorage:", err);
+    }
+  }, [auth]);
 
   const login = (newAuth) => {
     setAuth(newAuth);
@@ -27,9 +35,23 @@ export const AuthProvider = ({ children }) => {
     setAuth(null);
   };
 
+  const updateUser = (updatedUserData) => {
+    setAuth((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        user: {
+          ...prev.user,
+          ...updatedUserData,
+        },
+      };
+    });
+  };
+
   return (
-    <AuthContext.Provider value={{ auth, login, logout, isAuthenticated }}>
+    <AuthContext.Provider value={{ auth, login, logout, updateUser, isAuthenticated }}>
       {children}
     </AuthContext.Provider>
   );
 };
+

@@ -6,39 +6,42 @@ import Participation from "../models/Participation.js";
 
 // POST /volunteering (create volunteer + assign events)
 export async function createAndAssignVolunteer(req, res) {
+  const { events, name, email, password } = req.body;
+
+  if (!events || !Array.isArray(events) || events.length === 0) {
+    return res.status(400).json({
+      success: false,
+      message: "At least 1 event is required",
+    });
+  }
+
+  if (!name || !email || !password) {
+    return res.status(400).json({
+      success: false,
+      message: "Name, Email and Password are required",
+    });
+  }
+
+  const trimmedEmail = email.toLowerCase().trim();
+
+  // Check duplicate email before starting session
+  const existingUser = await User.findOne({ email: trimmedEmail });
+  if (existingUser) {
+    return res.status(400).json({
+      success: false,
+      message: "Volunteer already exists with this email",
+    });
+  }
+
   const session = await mongoose.startSession();
-  session.startTransaction();
 
   try {
-    const { events, name, email, password } = req.body;
-
-    if (!events || !Array.isArray(events) || events.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: "At least 1 event is required",
-      });
-    }
-
-    if (!name || !email || !password) {
-      return res.status(400).json({
-        success: false,
-        message: "Name, Email and Password are required",
-      });
-    }
-
-    // check duplicate email
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({
-        success: false,
-        message: "Volunteer already exists with this email",
-      });
-    }
+    session.startTransaction();
 
     const passwordHash = await bcrypt.hash(password, 10);
 
     const [volunteer] = await User.create(
-      [{ name, email, passwordHash, role: "VOLUNTEER" }],
+      [{ name: name.trim(), email: trimmedEmail, passwordHash, role: "VOLUNTEER" }],
       { session },
     );
 
@@ -49,59 +52,27 @@ export async function createAndAssignVolunteer(req, res) {
     );
 
     await session.commitTransaction();
-    session.endSession();
 
     return res.status(201).json({
       success: true,
       message: "Successfully created and assigned events to volunteer",
     });
   } catch (error) {
-    console.log("Create Volunteer Error:", error);
-    await session.abortTransaction();
-    session.endSession();
+    console.error("Create Volunteer Error:", error);
+    if (session.inTransaction()) {
+      await session.abortTransaction();
+    }
 
     return res.status(500).json({
       success: false,
-      message: "Error creating and assigning events to volunteer",
+      message: "Error creating and assigning events to volunteer: " + error.message,
     });
+  } finally {
+    await session.endSession();
   }
 }
 
-// GET /volunteering  — returns all volunteers shaped for the frontend table
-// export async function getAllVolunteers(req, res) {
-//   try {
-//     // Fetch every volunteering assignment and populate both user + event
-//     const assignments = await Volunteering.find()
-//       .populate("userId", "name email phone")
-//       .populate("eventId", "name");
-
-//     // Filter out any orphaned records (deleted user or event)
-//     const valid = assignments.filter((a) => a.userId && a.eventId);
-
-//     // Shape each assignment into a flat row the frontend expects
-//     const volunteers = valid.map((a) => ({
-//       id:            a._id,
-//       name:          a.userId.name,
-//       email:         a.userId.email,
-//       phone:         a.userId.phone ?? "N/A",
-//       assignedEvent: a.eventId.name,
-//       duty:          "General",
-//       status:        "Active",
-//       joinedAt:      a.createdAt.toLocaleDateString("en-IN", {
-//                        day: "2-digit", month: "short", year: "numeric",
-//                      }),
-//     }));
-
-//     return res.status(200).json(volunteers);
-//   } catch (error) {
-//     console.log("Get All Volunteers Error:", error);
-//     return res.status(500).json({
-//       success: false,
-//       message: "Failed to fetch volunteers",
-//     });
-//   }
-// }
-
+// GET /volunteering — returns all volunteers shaped for the frontend table
 export async function getAllVolunteers(req, res) {
   try {
     const assignments = await Volunteering.find()
@@ -111,23 +82,26 @@ export async function getAllVolunteers(req, res) {
     const valid = assignments.filter((a) => a.userId && a.eventId);
 
     const volunteers = valid.map((a) => ({
-      id: a.userId._id, // ✅ FIXED
+      id: a.userId._id,
+      assignmentId: a._id,
       name: a.userId.name,
       email: a.userId.email,
       phone: a.userId.phone ?? "N/A",
       assignedEvent: a.eventId.name,
-      duty: "General",
+      duty: a.role || "Volunteer",
       status: "Active",
-      joinedAt: a.createdAt.toLocaleDateString("en-IN", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      }),
+      joinedAt: a.createdAt
+        ? a.createdAt.toLocaleDateString("en-IN", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+          })
+        : "N/A",
     }));
 
     return res.status(200).json(volunteers);
   } catch (error) {
-    console.log("Get All Volunteers Error:", error);
+    console.error("Get All Volunteers Error:", error);
     return res.status(500).json({
       success: false,
       message: "Failed to fetch volunteers",

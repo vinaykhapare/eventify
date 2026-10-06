@@ -1,288 +1,534 @@
 import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
-  Mail, Lock, Eye, EyeOff, User,
-  AlertCircle, CheckCircle2,
+  User,
+  Mail,
+  Lock,
+  Eye,
+  EyeOff,
+  AlertCircle,
+  ArrowRight,
+  ArrowLeft,
+  Sun,
+  Moon,
+  ShieldCheck,
+  CheckCircle2,
+  Zap,
+  Ticket,
+  X,
+  UserCheck,
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { useNavigate, Link } from "react-router-dom";
 import { signupUser } from "../../api/authApi";
 import { useAuthContext } from "../../../hooks/useAuthContext";
-
-const inputClass = (state) => {
-  const base = "w-full pl-10 pr-4 py-2.5 sm:py-3 border-2 rounded-xl outline-none transition-all duration-200 bg-white text-sm";
-  if (state === "error")   return `${base} border-red-300 focus:border-red-400 focus:ring-4 focus:ring-red-500/10`;
-  if (state === "success") return `${base} border-green-300 focus:border-green-400 focus:ring-4 focus:ring-green-500/10`;
-  return `${base} border-gray-200 focus:border-[#D4607A] focus:ring-4 focus:ring-[#D4607A]/10`;
-};
+import { useTheme } from "../../hooks/useTheme";
+import BrandLogo from "../../components/common/BrandLogo";
 
 export default function Signup() {
-  const [serverError, setServerError]           = useState("");
-  const [successMsg, setSuccessMsg]             = useState("");
-  const [showPassword, setShowPassword]         = useState(false);
+  const [serverError, setServerError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [loading, setLoading]                   = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [agreeTerms, setAgreeTerms] = useState(true);
 
-  const navigate   = useNavigate();
-  const { login }  = useAuthContext();
+  const navigate = useNavigate();
+  const { login } = useAuthContext();
+  const { isDark, toggleTheme } = useTheme();
 
-  const { register, handleSubmit, watch, formState: { errors } } = useForm();
+  const {
+    register,
+    handleSubmit,
+    watch,
+    formState: { errors },
+  } = useForm({
+    defaultValues: {
+      name: "",
+      email: "",
+      password: "",
+      confirmPassword: "",
+    },
+  });
 
-  const passwordValue        = watch("password", "");
+  const passwordValue = watch("password", "");
   const confirmPasswordValue = watch("confirmPassword", "");
-  const password             = watch("password");
 
   const onSubmit = async (data) => {
+    if (data.password !== data.confirmPassword) {
+      setServerError("Passwords do not match");
+      return;
+    }
+
     try {
       setLoading(true);
       setServerError("");
-      setSuccessMsg("");
-      const res = await signupUser({ name: data.name, email: data.email, password: data.password, role: "STUDENT" });
-      setSuccessMsg(res.message);
+      const res = await signupUser({
+        name: data.name.trim(),
+        email: data.email.trim(),
+        password: data.password,
+        role: "STUDENT",
+      });
       login(res);
-      if (res.user.role === "ADMIN")        navigate("/admin/dashboard");
-      else if (res.user.role === "STUDENT") navigate("/events");
-      else                                  navigate("/assigned-events");
+      navigate("/events");
     } catch (error) {
-      setServerError(error.response?.data?.message || "Signup failed!");
+      setServerError(error.response?.data?.message || "Registration failed. Try again.");
     } finally {
       setLoading(false);
     }
   };
 
-  const confirmState =
-    errors.confirmPassword ? "error"
-    : confirmPasswordValue && confirmPasswordValue === password ? "success"
-    : "default";
-
   return (
-    <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-[#FDF0F3] via-[#F5F0FD] to-[#EEF0FD] px-3 sm:px-4 py-8 md:py-12">
-      <div className="w-full max-w-xs sm:max-w-md">
+    <div className="min-h-screen w-full flex bg-[#F8FAFC] dark:bg-[#090D16] text-slate-900 dark:text-slate-100 font-sans selection:bg-indigo-500/20 selection:text-indigo-600 transition-colors duration-300 relative overflow-hidden">
+      {/* ──────────────────────────────────────────────────────────
+          LEFT PANEL: Showcase & Visual Experience (Desktop / Tablet)
+          Identical Architecture to Login for Brand Consistency
+      ──────────────────────────────────────────────────────────── */}
+      <div className="hidden lg:flex lg:w-1/2 xl:w-[52%] relative bg-[#0B0F19] text-white flex-col justify-between p-10 xl:p-14 border-r border-slate-800/80 overflow-hidden">
+        {/* Subtle Architectural Grid Texture */}
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#1E293B18_1px,transparent_1px),linear-gradient(to_bottom,#1E293B18_1px,transparent_1px)] bg-[size:3.5rem_3.5rem] pointer-events-none" />
 
-        {/* Card */}
-        <div className="bg-white/95 backdrop-blur-md rounded-3xl shadow-2xl border border-white/60 overflow-hidden">
+        {/* Ambient Gradient Highlights */}
+        <div className="absolute -top-32 -left-32 w-96 h-96 bg-purple-600/15 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 right-0 w-80 h-80 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none" />
 
-          {/* Top accent bar */}
-          <div className="h-1.5 w-full" style={{ background: "linear-gradient(90deg, #D4607A 0%, #8B5CB7 50%, #534AB7 100%)" }} />
+        {/* Top Header */}
+        <div className="relative z-10 flex items-center justify-between">
+          <Link to="/" className="focus:outline-none">
+            <BrandLogo size="lg" />
+          </Link>
 
-          <div className="p-6 sm:p-8 md:p-10">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900/90 border border-slate-800/90 text-xs font-semibold text-slate-300 backdrop-blur-md">
+            <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span>Campus Network Active</span>
+          </div>
+        </div>
 
-            {/* Header */}
-            <div className="text-center mb-7">
-              <div className="inline-flex items-center justify-center mb-4">
-                <svg width="56" height="56" viewBox="0 0 56 56" fill="none">
-                  <defs>
-                    <linearGradient id="shg" x1="0" y1="0" x2="56" y2="56" gradientUnits="userSpaceOnUse">
-                      <stop offset="0%"   stopColor="#D4607A"/>
-                      <stop offset="50%"  stopColor="#8B5CB7"/>
-                      <stop offset="100%" stopColor="#534AB7"/>
-                    </linearGradient>
-                  </defs>
-                  <path d="M28 3 L51 16 L51 40 L28 53 L5 40 L5 16 Z" fill="url(#shg)"/>
-                  <path d="M28 7 L47 18 L47 38 L28 49 L9 38 L9 18 Z" fill="white" fillOpacity="0.07"/>
-                  <text x="28" y="37" textAnchor="middle" fill="white" fontSize="26" fontWeight="700"
-                    fontFamily="Georgia, 'Times New Roman', serif" opacity="0.95">E</text>
-                  <circle cx="44" cy="11" r="4" fill="#F5A623"/>
-                  <circle cx="44" cy="11" r="2" fill="white" fillOpacity="0.55"/>
-                </svg>
+        {/* Centerpiece: Platform Capability Highlights */}
+        <div className="relative z-10 my-auto py-8 space-y-8 max-w-xl">
+          {/* Main Headline */}
+          <div className="space-y-3">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-400 text-xs font-bold uppercase tracking-wider">
+              <ShieldCheck size={14} />
+              <span>Student & Participant Network</span>
+            </div>
+            <h1 className="font-heading font-extrabold text-3xl xl:text-4xl tracking-tight leading-tight text-white">
+              Join your campus event community.
+            </h1>
+            <p className="text-sm xl:text-base text-slate-400 leading-relaxed max-w-lg">
+              Register once with your student email to reserve verified tickets, attend college hackathons, and collaborate on campus festivals.
+            </p>
+          </div>
+
+          {/* Platform Capability Highlights */}
+          <div className="relative pt-2 space-y-3.5">
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.1 }}
+              className="backdrop-blur-xl bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 flex items-start gap-3.5 hover:border-slate-700/80 transition-colors"
+            >
+              <div className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-400 shrink-0 mt-0.5">
+                <Ticket size={18} />
               </div>
+              <div className="space-y-0.5 min-w-0">
+                <h3 className="text-xs font-heading font-bold text-white tracking-wide uppercase">
+                  Digital Pass Architecture
+                </h3>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Cryptographically signed dynamic QR passes linked directly to your student credentials.
+                </p>
+              </div>
+            </motion.div>
 
-              <h1
-                className="text-2xl sm:text-3xl font-bold mb-1.5"
-                style={{
-                  background: "linear-gradient(90deg, #D4607A 0%, #6B5EC7 100%)",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                  backgroundClip: "text",
-                  fontFamily: "Georgia, 'Times New Roman', serif",
-                }}
-              >
-                Create Account
-              </h1>
-              <p className="text-sm text-gray-500">Join Eventify and start your journey</p>
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.2 }}
+              className="backdrop-blur-xl bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 flex items-start gap-3.5 hover:border-slate-700/80 transition-colors"
+            >
+              <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-400 shrink-0 mt-0.5">
+                <Zap size={18} />
+              </div>
+              <div className="space-y-0.5 min-w-0">
+                <h3 className="text-xs font-heading font-bold text-white tracking-wide uppercase">
+                  Sub-Second Gate Ingress
+                </h3>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Fast camera scan verification ensuring zero queues during peak arena and auditorium entries.
+                </p>
+              </div>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.3 }}
+              className="backdrop-blur-xl bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 flex items-start gap-3.5 hover:border-slate-700/80 transition-colors"
+            >
+              <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-400 shrink-0 mt-0.5">
+                <ShieldCheck size={18} />
+              </div>
+              <div className="space-y-0.5 min-w-0">
+                <h3 className="text-xs font-heading font-bold text-white tracking-wide uppercase">
+                  Institutional Security & SSO
+                </h3>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Role-segmented access control for participants, event volunteers, and administrative boards.
+                </p>
+              </div>
+            </motion.div>
+          </div>
+        </div>
+
+        {/* Bottom Proof Quote */}
+        <div className="relative z-10 pt-4 border-t border-slate-800/60 flex items-center justify-between text-xs text-slate-400">
+          <p className="truncate">
+            Trusted by student affairs councils, club leads, and event coordinators.
+          </p>
+          <span className="font-mono text-[11px] text-slate-500 shrink-0">v2.4.0</span>
+        </div>
+      </div>
+
+      {/* ──────────────────────────────────────────────────────────
+          RIGHT PANEL: Focused Registration Form
+      ──────────────────────────────────────────────────────────── */}
+      <div className="w-full lg:w-1/2 xl:w-[48%] flex flex-col justify-between p-6 sm:p-10 lg:p-12 xl:p-16 relative z-10 overflow-y-auto">
+        {/* Navigation & Controls Bar */}
+        <div className="flex items-center justify-between w-full">
+          {/* Mobile Brand Mark */}
+          <div className="lg:hidden">
+            <Link to="/" className="focus:outline-none">
+              <BrandLogo size="md" />
+            </Link>
+          </div>
+
+          {/* Desktop Back Link */}
+          <div className="hidden lg:block">
+            <Link
+              to="/"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
+            >
+              <ArrowLeft size={14} />
+              <span>Back to home</span>
+            </Link>
+          </div>
+
+          {/* Right Controls: Theme Toggle & Sign in link */}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={toggleTheme}
+              className="p-2 rounded-xl text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              title={isDark ? "Switch to light mode" : "Switch to dark mode"}
+              aria-label="Toggle theme"
+            >
+              {isDark ? <Sun size={18} className="text-amber-400" /> : <Moon size={18} />}
+            </button>
+
+            <Link
+              to="/login"
+              className="inline-flex items-center gap-1 px-3.5 py-1.5 rounded-xl text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 border border-indigo-200/60 dark:border-indigo-800/60 transition-colors"
+            >
+              <span>Sign in</span>
+              <ArrowRight size={13} />
+            </Link>
+          </div>
+        </div>
+
+        {/* Center Form Card */}
+        <div className="max-w-md w-full mx-auto my-auto py-8">
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4 }}
+            className="space-y-6"
+          >
+            {/* Header Titles */}
+            <div className="space-y-1.5">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                <UserCheck size={11} className="text-indigo-500" />
+                <span>Student & Participant Portal</span>
+              </div>
+              <h2 className="font-heading font-extrabold text-2xl sm:text-3xl tracking-tight text-slate-900 dark:text-white">
+                Create an account
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+                Register to explore upcoming campus events, reserve seats, and generate digital tickets.
+              </p>
             </div>
 
-            <form className="space-y-4" onSubmit={handleSubmit(onSubmit)}>
+            {/* Server Error Alert */}
+            <AnimatePresence>
+              {serverError && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.25 }}
+                  className="p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/60 text-rose-700 dark:text-rose-300 text-xs flex items-center justify-between gap-3 font-medium"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <AlertCircle size={16} className="shrink-0 text-rose-500" />
+                    <span className="truncate">{serverError}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setServerError("")}
+                    className="p-1 text-rose-400 hover:text-rose-600 dark:hover:text-rose-200 transition-colors"
+                  >
+                    <X size={14} />
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
+            {/* Registration Form */}
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
               {/* Full Name */}
               <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1.5 tracking-wide uppercase">Full Name</label>
-                <div className="relative">
-                  <User className={`absolute left-3 top-1/2 -translate-y-1/2 ${errors.name ? "text-red-400" : "text-gray-400"}`} size={18}/>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
+                  Full Name
+                </label>
+                <div className="relative group">
+                  <User
+                    size={16}
+                    className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-600 dark:group-focus-within:text-indigo-400 transition-colors"
+                  />
                   <input
                     type="text"
-                    placeholder="Raj Kumar"
-                    className={inputClass(errors.name ? "error" : "default")}
+                    autoComplete="name"
                     {...register("name", {
                       required: "Full name is required",
-                      minLength: { value: 3, message: "Name must be at least 3 characters" },
+                      minLength: { value: 2, message: "Name must be at least 2 characters" },
                     })}
+                    placeholder="Jane Doe"
+                    className={`w-full pl-10 pr-4 py-3 text-sm rounded-xl bg-white dark:bg-slate-900 border text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-4 focus:ring-indigo-500/10 transition-all duration-150 ${
+                      errors.name
+                        ? "border-rose-300 dark:border-rose-700 focus:border-rose-500"
+                        : "border-slate-200 dark:border-slate-800 focus:border-indigo-600 dark:focus:border-indigo-500 shadow-2xs"
+                    }`}
                   />
-                  {errors.name && <AlertCircle className="absolute right-3 top-1/2 -translate-y-1/2 text-red-400" size={18}/>}
                 </div>
                 {errors.name && (
-                  <p className="flex items-center gap-1.5 mt-1.5 text-xs font-medium text-red-500">
-                    <AlertCircle size={13}/> {errors.name.message}
+                  <p className="text-xs text-rose-500 mt-1 font-medium flex items-center gap-1">
+                    <AlertCircle size={12} />
+                    {errors.name.message}
                   </p>
                 )}
               </div>
 
-              {/* Email */}
+              {/* Email Address */}
               <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1.5 tracking-wide uppercase">Email Address</label>
-                <div className="relative">
-                  <Mail className={`absolute left-3 top-1/2 -translate-y-1/2 ${errors.email ? "text-red-400" : "text-gray-400"}`} size={18}/>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
+                  Institutional Email
+                </label>
+                <div className="relative group">
+                  <Mail
+                    size={16}
+                    className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-600 dark:group-focus-within:text-indigo-400 transition-colors"
+                  />
                   <input
                     type="email"
-                    placeholder="you@example.com"
-                    className={inputClass(errors.email ? "error" : "default")}
+                    autoComplete="email"
                     {...register("email", {
-                      required: "Email is required",
-                      pattern: { value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: "Enter a valid email address" },
+                      required: "Email address is required",
+                      pattern: {
+                        value: /^\S+@\S+$/i,
+                        message: "Please enter a valid email address",
+                      },
                     })}
+                    placeholder="name@university.edu"
+                    className={`w-full pl-10 pr-4 py-3 text-sm rounded-xl bg-white dark:bg-slate-900 border text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-4 focus:ring-indigo-500/10 transition-all duration-150 ${
+                      errors.email
+                        ? "border-rose-300 dark:border-rose-700 focus:border-rose-500"
+                        : "border-slate-200 dark:border-slate-800 focus:border-indigo-600 dark:focus:border-indigo-500 shadow-2xs"
+                    }`}
                   />
-                  {errors.email && <AlertCircle className="absolute right-3 top-1/2 -translate-y-1/2 text-red-400" size={18}/>}
                 </div>
                 {errors.email && (
-                  <p className="flex items-center gap-1.5 mt-1.5 text-xs font-medium text-red-500">
-                    <AlertCircle size={13}/> {errors.email.message}
+                  <p className="text-xs text-rose-500 mt-1 font-medium flex items-center gap-1">
+                    <AlertCircle size={12} />
+                    {errors.email.message}
                   </p>
                 )}
               </div>
 
               {/* Password */}
               <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1.5 tracking-wide uppercase">Password</label>
-                <div className="relative">
-                  <Lock className={`absolute left-3 top-1/2 -translate-y-1/2 ${errors.password ? "text-red-400" : "text-gray-400"}`} size={18}/>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
+                  Password
+                </label>
+                <div className="relative group">
+                  <Lock
+                    size={16}
+                    className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-600 dark:group-focus-within:text-indigo-400 transition-colors"
+                  />
                   <input
                     type={showPassword ? "text" : "password"}
-                    placeholder="Create a password"
-                    className={`${inputClass(errors.password ? "error" : "default")} pr-12`}
+                    autoComplete="new-password"
                     {...register("password", {
                       required: "Password is required",
-                      minLength: { value: 8, message: "Password must be at least 8 characters" },
-                      pattern: {
-                        value: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/,
-                        message: "Must include uppercase, lowercase, number & special character",
-                      },
+                      minLength: { value: 6, message: "Minimum 6 characters required" },
                     })}
+                    placeholder="••••••••••••"
+                    className={`w-full pl-10 pr-11 py-3 text-sm rounded-xl bg-white dark:bg-slate-900 border text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-4 focus:ring-indigo-500/10 transition-all duration-150 ${
+                      errors.password
+                        ? "border-rose-300 dark:border-rose-700 focus:border-rose-500"
+                        : "border-slate-200 dark:border-slate-800 focus:border-indigo-600 dark:focus:border-indigo-500 shadow-2xs"
+                    }`}
                   />
-                  {passwordValue.length > 0 && (
-                    <button type="button" onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors z-10">
-                      {showPassword ? <EyeOff size={18}/> : <Eye size={18}/>}
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
                 </div>
                 {errors.password && (
-                  <p className="flex items-center gap-1.5 mt-1.5 text-xs font-medium text-red-500">
-                    <AlertCircle size={13}/> {errors.password.message}
+                  <p className="text-xs text-rose-500 mt-1 font-medium flex items-center gap-1">
+                    <AlertCircle size={12} />
+                    {errors.password.message}
                   </p>
                 )}
               </div>
 
               {/* Confirm Password */}
               <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1.5 tracking-wide uppercase">Confirm Password</label>
-                <div className="relative">
-                  <Lock className={`absolute left-3 top-1/2 -translate-y-1/2 ${errors.confirmPassword ? "text-red-400" : "text-gray-400"}`} size={18}/>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
+                  Confirm Password
+                </label>
+                <div className="relative group">
+                  <Lock
+                    size={16}
+                    className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-600 dark:group-focus-within:text-indigo-400 transition-colors"
+                  />
                   <input
                     type={showConfirmPassword ? "text" : "password"}
-                    placeholder="Confirm your password"
-                    className={`${inputClass(confirmState)} pr-12`}
+                    autoComplete="new-password"
                     {...register("confirmPassword", {
-                      required: "Confirm password is required",
-                      validate: (value) => value === password || "Passwords do not match",
+                      required: "Please confirm your password",
                     })}
+                    placeholder="••••••••••••"
+                    className="w-full pl-10 pr-11 py-3 text-sm rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-600 dark:focus:border-indigo-500 transition-all duration-150 shadow-2xs"
                   />
-                  {/* Match tick */}
-                  {confirmState === "success" && (
-                    <CheckCircle2 className="absolute right-10 top-1/2 -translate-y-1/2 text-green-500" size={18}/>
-                  )}
-                  {confirmPasswordValue.length > 0 && (
-                    <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors z-10">
-                      {showConfirmPassword ? <EyeOff size={18}/> : <Eye size={18}/>}
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                    aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                  >
+                    {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
                 </div>
-                {errors.confirmPassword && (
-                  <p className="flex items-center gap-1.5 mt-1.5 text-xs font-medium text-red-500">
-                    <AlertCircle size={13}/> {errors.confirmPassword.message}
+                {confirmPasswordValue && confirmPasswordValue === passwordValue && (
+                  <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1.5 flex items-center gap-1 font-medium">
+                    <CheckCircle2 size={13} /> Passwords match
                   </p>
                 )}
-                {confirmState === "success" && (
-                  <p className="flex items-center gap-1.5 mt-1.5 text-xs font-medium text-green-600">
-                    <CheckCircle2 size={13}/> Passwords match
+                {errors.confirmPassword && (
+                  <p className="text-xs text-rose-500 mt-1 font-medium flex items-center gap-1">
+                    <AlertCircle size={12} />
+                    {errors.confirmPassword.message}
                   </p>
                 )}
               </div>
 
-              {/* Server Error */}
-              {serverError && (
-                <div className="flex items-start gap-3 p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-700">
-                  <AlertCircle className="shrink-0 mt-0.5" size={16}/>
-                  <div>
-                    <p className="text-xs font-bold">Error</p>
-                    <p className="text-xs mt-0.5">{serverError}</p>
-                  </div>
-                </div>
-              )}
+              {/* Terms Agreement Checkbox */}
+              <div className="flex items-start gap-2 pt-1">
+                <input
+                  type="checkbox"
+                  id="agree-terms"
+                  checked={agreeTerms}
+                  onChange={(e) => setAgreeTerms(e.target.checked)}
+                  className="size-4 mt-0.5 rounded-md border-slate-300 dark:border-slate-700 text-indigo-600 focus:ring-indigo-500 dark:bg-slate-900 cursor-pointer"
+                />
+                <label
+                  htmlFor="agree-terms"
+                  className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed cursor-pointer select-none"
+                >
+                  I agree to the{" "}
+                  <span className="font-semibold text-slate-700 dark:text-slate-300 hover:underline">
+                    Campus Event Guidelines
+                  </span>{" "}
+                  and{" "}
+                  <span className="font-semibold text-slate-700 dark:text-slate-300 hover:underline">
+                    Privacy Policy
+                  </span>
+                  .
+                </label>
+              </div>
 
-              {/* Success */}
-              {successMsg && (
-                <div className="flex items-start gap-3 p-3.5 rounded-xl bg-green-50 border border-green-200 text-green-700">
-                  <CheckCircle2 className="shrink-0 mt-0.5" size={16}/>
-                  <div>
-                    <p className="text-xs font-bold">Success!</p>
-                    <p className="text-xs mt-0.5">{successMsg}</p>
-                  </div>
-                </div>
-              )}
-
-              {/* Submit */}
+              {/* Submit Button */}
               <button
-                disabled={loading}
                 type="submit"
-                className="w-full py-2.5 sm:py-3 rounded-xl font-bold text-sm text-white transition-all duration-200 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100 mt-1"
-                style={{
-                  background: "linear-gradient(90deg, #D4607A 0%, #8B5CB7 50%, #534AB7 100%)",
-                  boxShadow: "0 4px 18px rgba(212,96,122,0.35)",
-                }}
-                onMouseEnter={e => { if (!loading) e.currentTarget.style.boxShadow = "0 6px 24px rgba(107,94,199,0.45)"; }}
-                onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 4px 18px rgba(212,96,122,0.35)"; }}
+                disabled={loading || !agreeTerms}
+                className="w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl font-heading font-bold text-xs uppercase tracking-wider text-white bg-slate-900 hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100 shadow-lg shadow-slate-950/10 dark:shadow-white/5 active:scale-[0.99] disabled:opacity-50 transition-all duration-150 mt-3 group cursor-pointer"
               >
                 {loading ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                  <>
+                    <svg
+                      className="animate-spin -ml-1 mr-2 h-4 w-4 text-current"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      />
                     </svg>
-                    Creating Account...
-                  </span>
-                ) : "Create Account"}
+                    <span>Creating account...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Complete Registration</span>
+                    <ArrowRight
+                      size={15}
+                      className="transition-transform duration-150 group-hover:translate-x-1"
+                    />
+                  </>
+                )}
               </button>
             </form>
 
-            {/* Footer */}
-            <p className="mt-6 text-center text-sm text-gray-500">
-              Already have an account?{" "}
-              <Link
-                to="/login"
-                className="font-bold transition-colors"
-                style={{ color: "#D4607A" }}
-                onMouseEnter={e => { e.currentTarget.style.color = "#6B5EC7"; }}
-                onMouseLeave={e => { e.currentTarget.style.color = "#D4607A"; }}
-              >
-                Login instead
-              </Link>
-            </p>
-          </div>
+            {/* Footer Sign in Prompt */}
+            <div className="text-center pt-2">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Already registered?{" "}
+                <Link
+                  to="/login"
+                  className="font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
+                >
+                  Sign in here
+                </Link>
+              </p>
+            </div>
+          </motion.div>
         </div>
 
-        <p className="text-center text-xs text-gray-400 mt-5 tracking-widest uppercase">
-          Eventify · College Event Management
-        </p>
+        {/* Security & System Info Footer */}
+        <div className="w-full text-center sm:text-left flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-slate-400 pt-4 border-t border-slate-200/80 dark:border-slate-800/80">
+          <p>Campus Single Sign-On & Identity Directory</p>
+          <div className="flex items-center gap-3">
+            <span className="hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
+              Privacy Notice
+            </span>
+            <span>•</span>
+            <span className="hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
+              Security Compliance
+            </span>
+          </div>
+        </div>
       </div>
     </div>
   );

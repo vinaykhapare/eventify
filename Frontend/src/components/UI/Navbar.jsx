@@ -58,57 +58,13 @@ const ROLE_STYLE = {
   VOLUNTEER: { bg: "#FEF6EC", text: "#C47A1A", border: "#F5D49A" },
 };
 
+import BrandLogo from "../common/BrandLogo";
+
 // ── Eventify Logo ──────────────────────────────────────────────────────────────
-// `compact` = md/lg when ADMIN is logged in — show hex icon only, hide wordmark
 function EventifyLogo({ compact = false }) {
   return (
     <Link to="/" className="flex items-center gap-2.5 group shrink-0 select-none">
-      {/* Hexagon icon */}
-      <div className="relative shrink-0" style={{ width: 40, height: 40 }}>
-        <svg width="40" height="40" viewBox="0 0 46 46" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <linearGradient id="hexGrad" x1="0" y1="0" x2="46" y2="46" gradientUnits="userSpaceOnUse">
-              <stop offset="0%"   stopColor="#D4607A" />
-              <stop offset="50%"  stopColor="#8B5CB7" />
-              <stop offset="100%" stopColor="#534AB7" />
-            </linearGradient>
-          </defs>
-          <path d="M23 2 L42 12.5 L42 33.5 L23 44 L4 33.5 L4 12.5 Z" fill="url(#hexGrad)" />
-          <path d="M23 5 L39 14.5 L39 31.5 L23 41 L7 31.5 L7 14.5 Z" fill="white" fillOpacity="0.06" />
-          <text
-            x="23" y="31" textAnchor="middle" fill="white"
-            fontSize="24" fontWeight="700"
-            fontFamily="Georgia, 'Times New Roman', serif"
-            opacity="0.95"
-          >
-            E
-          </text>
-          <circle cx="37" cy="9" r="3.5" fill="#F5A623" />
-          <circle cx="37" cy="9" r="1.8" fill="white" fillOpacity="0.6" />
-        </svg>
-      </div>
-
-      {/* Wordmark — hidden on md/lg when compact (many links), shown on xl+ or when few links */}
-      <div className={`flex-col leading-none ${compact ? "hidden xl:flex" : "hidden sm:flex"}`}>
-        <span
-          className="text-[20px] font-bold tracking-tight"
-          style={{
-            fontFamily: "Georgia, 'Times New Roman', serif",
-            background: BRAND.gradientText,
-            WebkitBackgroundClip: "text",
-            WebkitTextFillColor: "transparent",
-            backgroundClip: "text",
-          }}
-        >
-          Eventify
-        </span>
-        <span
-          className="text-[8px] font-semibold tracking-[0.18em] uppercase mt-0.5"
-          style={{ color: "#9B9BA8" }}
-        >
-          College Events
-        </span>
-      </div>
+      <BrandLogo showText={!compact} size="sm" />
     </Link>
   );
 }

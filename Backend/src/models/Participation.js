@@ -24,6 +24,7 @@ const participationSchema = new mongoose.Schema(
 );
 
 participationSchema.index({ userId: 1, eventId: 1 }, { unique: true });
+participationSchema.index({ eventId: 1, checkedIn: 1 });
 
 const Participation = mongoose.model("Participation", participationSchema);
 
